@@ -7,12 +7,61 @@ import { LandingPage } from './pages/LandingPage';
 import { Onboarding } from './pages/Onboarding';
 import { EditorPage } from './pages/EditorPage';
 import { CheckoutPage } from './pages/CheckoutPage';
+import { PublishedPage } from './pages/PublishedPage';
 import { mapIntakeToPuckConfig } from './lib/ai-mapper';
 import { marketplaceService } from './lib/marketplaceService';
 import { EdgeRootProps, TemplateFamily, MarketplaceIntakeData } from './lib/types';
 
+import { Router, Route, Switch, useLocation } from 'wouter';
+import { motion, AnimatePresence } from 'motion/react';
+
+const GeneratingScreen = () => {
+  const [messageIndex, setMessageIndex] = React.useState(0);
+  const messages = [
+    "Analyzing brand identity...",
+    "Selecting structural layouts...",
+    "Writing high-converting copy...",
+    "Applying Milano design tokens...",
+    "Finalizing storefront architecture..."
+  ];
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setMessageIndex(prev => Math.min(prev + 1, messages.length - 1));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="h-screen w-full flex items-center justify-center bg-[#F9F8F6] text-[#1A1A1A]">
+      <div className="text-center max-w-md w-full px-6">
+        <div className="h-10 w-10 border-2 border-black/10 border-t-black rounded-full animate-spin mx-auto mb-10"></div>
+        <AnimatePresence mode="wait">
+          <motion.p 
+            key={messageIndex}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="font-serif italic text-2xl tracking-tight text-[#1A1A1A]"
+          >
+            {messages[messageIndex]}
+          </motion.p>
+        </AnimatePresence>
+        <div className="w-full bg-black/5 h-1 mt-8 overflow-hidden rounded-full">
+           <motion.div 
+             className="bg-black h-full"
+             initial={{ width: "0%" }}
+             animate={{ width: `${((messageIndex + 1) / messages.length) * 100}%` }}
+             transition={{ duration: 1.8, ease: "easeInOut" }}
+           />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
-  const [view, setView] = useState<'landing' | 'onboarding' | 'editor' | 'checkout'>('landing');
+  const [location, setLocation] = useLocation();
   const [intakeData, setIntakeData] = useState<MarketplaceIntakeData | null>(null);
   const [editorState, setEditorState] = useState<{
     initialData: any;
@@ -27,13 +76,8 @@ export default function App() {
     setIntakeData(data);
     
     try {
-      // Save to Supabase
-      try {
-        await marketplaceService.saveMarketplace(data);
-        console.log("Marketplace saved to Supabase successfully");
-      } catch (dbError) {
-        console.warn("Could not save to Supabase. Check credentials.", dbError);
-      }
+      // Save to Supabase (optional/background)
+      marketplaceService.saveMarketplace(data).catch(err => console.warn("Supabase save failed", err));
 
       const response = await fetch('/api/generate-page', {
         method: 'POST',
@@ -44,7 +88,6 @@ export default function App() {
       const mappedConfig = mapIntakeToPuckConfig(data);
       if (response.ok) {
         const aiData = await response.json();
-        // Override content from AI
         if (aiData.content && Array.isArray(aiData.content)) {
           mappedConfig.initialData.content = aiData.content.map((item: any, idx: number) => ({
             ...item,
@@ -55,8 +98,6 @@ export default function App() {
             }
           }));
         }
-      } else {
-        console.warn("AI generation failed, falling back to local mapper");
       }
       
       setEditorState({
@@ -67,62 +108,84 @@ export default function App() {
           paymentConfigured: ['checkout', 'digital', 'catalog'].includes(mappedConfig.rootProps.commerceMode) ? true : undefined
         },
       });
-      setView('editor');
+      setLocation('/editor');
     } catch (e) {
       console.error("AI Generation failed:", e);
       const mappedConfig = mapIntakeToPuckConfig(data);
       setEditorState({
         initialData: mappedConfig.initialData,
         templateFamily: data.businessType,
-        rootProps: {
-          ...mappedConfig.rootProps,
-          paymentConfigured: ['checkout', 'digital', 'catalog'].includes(mappedConfig.rootProps.commerceMode) ? true : undefined
-        },
+        rootProps: mappedConfig.rootProps,
       });
-      setView('editor');
+      setLocation('/editor');
     } finally {
       setIsGenerating(false);
     }
   };
 
   if (isGenerating) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center bg-[#F9F8F6] text-[#1A1A1A]">
-        <div className="text-center">
-          <div className="h-10 w-10 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-          <p className="font-serif italic text-2xl tracking-tight">AI is designing your site...</p>
-        </div>
-      </div>
-    );
+    return <GeneratingScreen />;
   }
 
-  if (view === 'landing') {
-    return <LandingPage onStart={() => setView('onboarding')} />;
-  }
-
-  if (view === 'editor' && editorState) {
-    return (
-      <EditorPage 
-        initialData={editorState.initialData} 
-        templateFamily={editorState.templateFamily} 
-        rootProps={editorState.rootProps} 
-        onPublish={() => setView('checkout')}
-      />
-    );
-  }
-
-  if (view === 'checkout' && intakeData) {
-    return (
-      <CheckoutPage 
-        intakeData={intakeData}
-        onBack={() => setView('editor')}
-        onComplete={(plan) => {
-          alert(`Great! You've selected the ${plan} plan. Redirecting to Stripe...`);
-          // Here you would integrate Stripe
-        }}
-      />
-    );
-  }
-
-  return <Onboarding onComplete={handleOnboardingComplete} />;
+  return (
+    <Router>
+      <Switch>
+        <Route path="/">
+          <LandingPage onStart={() => setLocation('/onboarding')} />
+        </Route>
+        
+        <Route path="/onboarding">
+          <Onboarding onComplete={handleOnboardingComplete} />
+        </Route>
+        
+        <Route path="/editor">
+          {editorState ? (
+            <EditorPage 
+              initialData={editorState.initialData} 
+              templateFamily={editorState.templateFamily} 
+              rootProps={editorState.rootProps} 
+              onPublish={() => setLocation('/checkout')}
+            />
+          ) : (
+            <div className="p-20 text-center">
+              <p>No editor state found. Please complete <a href="/onboarding" className="underline">onboarding</a>.</p>
+            </div>
+          )}
+        </Route>
+        
+        <Route path="/checkout">
+          {intakeData ? (
+            <CheckoutPage 
+              intakeData={intakeData}
+              onBack={() => setLocation('/editor')}
+              onComplete={(plan) => {
+                setLocation('/published');
+              }}
+            />
+          ) : (
+            <div className="p-20 text-center">
+              <p>No checkout data found. Please complete <a href="/onboarding" className="underline">onboarding</a>.</p>
+            </div>
+          )}
+        </Route>
+        
+        <Route path="/published">
+          {intakeData ? (
+            <PublishedPage intakeData={intakeData} />
+          ) : (
+            <div className="p-20 text-center">
+              <p>No deployment data found. Please complete <a href="/onboarding" className="underline">onboarding</a>.</p>
+            </div>
+          )}
+        </Route>
+        
+        <Route>
+          <div className="p-20 text-center">
+            <h1 className="text-4xl font-bold mb-4">404</h1>
+            <p>Page not found. <a href="/" className="underline">Return home</a>.</p>
+          </div>
+        </Route>
+      </Switch>
+    </Router>
+  );
 }

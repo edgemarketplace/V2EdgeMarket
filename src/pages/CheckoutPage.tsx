@@ -7,20 +7,77 @@ import {
   Globe, 
   ArrowLeft, 
   CreditCard, 
-  Briefcase, 
+  ChevronRight,
   Mail, 
   MapPin, 
   Tag, 
-  Target,
-  ChevronRight
+  Target
 } from 'lucide-react';
 import { MarketplaceIntakeData } from '../lib/types';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+// Dummy test key for UI purposes
+const stripePromise = loadStripe('pk_test_TYooMQauvdEDq54NiTphI7jx');
 
 interface CheckoutPageProps {
   intakeData: MarketplaceIntakeData;
   onBack: () => void;
   onComplete: (plan: 'launch' | 'pro') => void;
 }
+
+const CheckoutForm = ({ plan, onComplete }: { plan: 'launch' | 'pro', onComplete: (plan: 'launch' | 'pro') => void }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setIsProcessing(true);
+    // Simulate network delay for payment processing
+    setTimeout(() => {
+      setIsProcessing(false);
+      onComplete(plan);
+    }, 1500);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6 w-full">
+      <div className="p-4 border border-black/10 rounded-xl bg-white shadow-sm mt-4">
+        <CardElement options={{
+          style: {
+            base: {
+              fontSize: '16px',
+              color: '#1A1A1A',
+              '::placeholder': { color: '#aab7c4' },
+              fontFamily: 'Inter, sans-serif'
+            },
+            invalid: { color: '#9e2146' },
+          },
+        }} />
+      </div>
+      <button 
+        type="submit"
+        disabled={!stripe || isProcessing}
+        className="w-full bg-black text-white p-6 rounded-2xl font-bold flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-black/10 group disabled:opacity-50 disabled:scale-100"
+      >
+        {isProcessing ? (
+          <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+        ) : (
+          <CreditCard className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+        )}
+        {isProcessing ? 'Processing Payment...' : (plan === 'launch' ? 'Pay $5 Activation & Launch' : 'Start Subscription & Launch')}
+        {!isProcessing && <ChevronRight className="w-5 h-5 opacity-30" />}
+      </button>
+      <p className="text-center text-[10px] text-black/30 mt-6 font-medium italic">
+        {plan === 'launch' 
+          ? '*Activation fee is refunded after your first successful sale.' 
+          : 'Subscription starts immediately. Billed monthly. Cancel anytime.'}
+      </p>
+    </form>
+  );
+};
 
 export const CheckoutPage: React.FC<CheckoutPageProps> = ({ intakeData, onBack, onComplete }) => {
   const [selectedPlan, setSelectedPlan] = useState<'launch' | 'pro'>('launch');
@@ -239,23 +296,13 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ intakeData, onBack, 
             </div>
 
             <div className="pt-8 border-t border-black/5">
-              <button 
-                onClick={() => onComplete(selectedPlan)}
-                className="w-full bg-black text-white p-6 rounded-2xl font-bold flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-black/10 group"
-              >
-                <CreditCard className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                {selectedPlan === 'launch' ? 'Pay $5 Activation & Launch' : 'Start Subscription & Launch'}
-                <ChevronRight className="w-5 h-5 opacity-30" />
-              </button>
-              <p className="text-center text-[10px] text-black/30 mt-6 font-medium italic">
-                {selectedPlan === 'launch' 
-                  ? '*Activation fee is refunded after your first successful sale.' 
-                  : 'Subscription starts immediately. Billed monthly. Cancel anytime.'}
-              </p>
+              <Elements stripe={stripePromise}>
+                <CheckoutForm plan={selectedPlan} onComplete={onComplete} />
+              </Elements>
             </div>
 
             {/* Core Features Recap */}
-            <div className="bg-white border border-black/5 p-8 rounded-2xl">
+            <div className="bg-white border border-black/5 p-8 rounded-2xl mt-8">
               <p className="text-[10px] font-bold uppercase tracking-widest text-black/30 mb-6 text-center italic">Included in both tiers</p>
               <div className="grid grid-cols-2 gap-4">
                  {[

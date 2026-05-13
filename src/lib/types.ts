@@ -23,6 +23,7 @@ export interface EdgeRootProps {
     primaryColor: string;
     fontFamily: string;
     borderRadius: string;
+    stylePreset?: "milano" | "standard" | "minimal";
   };
   seo: {
     metaTitle: string;

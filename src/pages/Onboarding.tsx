@@ -16,7 +16,7 @@ import { MarketplaceIntakeData, TemplateFamily, CommerceMode, InventoryItem } fr
 
 export function Onboarding({ onComplete }: { onComplete: (data: MarketplaceIntakeData) => void }) {
   const [step, setStep] = useState<1 | 2>(1);
-  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<MarketplaceIntakeData>({
+  const { register, handleSubmit, control, watch, setValue, trigger, formState: { errors } } = useForm<MarketplaceIntakeData>({
     defaultValues: {
       businessType: 'retail-core',
       primaryGoal: 'checkout',
@@ -38,7 +38,12 @@ export function Onboarding({ onComplete }: { onComplete: (data: MarketplaceIntak
     onComplete(data);
   };
 
-  const nextStep = () => setStep(2);
+  const nextStep = async () => {
+    const isValid = await trigger(['businessName', 'businessType', 'offerings', 'primaryGoal', 'contactEmail']);
+    if (isValid) {
+      setStep(2);
+    }
+  };
   const prevStep = () => setStep(1);
 
   return (
@@ -75,19 +80,20 @@ export function Onboarding({ onComplete }: { onComplete: (data: MarketplaceIntak
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Business Name</label>
+                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Business Name *</label>
                   <input 
-                    {...register("businessName", { required: true })}
-                    className="block w-full border-b border-black/10 bg-transparent py-4 focus:outline-none focus:border-black text-lg transition-colors italic font-serif"
+                    {...register("businessName", { required: "Business name is required" })}
+                    className={`block w-full border-b ${errors.businessName ? 'border-red-500' : 'border-black/10'} bg-transparent py-4 focus:outline-none focus:border-black text-lg transition-colors italic font-serif`}
                     placeholder="e.g. Bella's Blooms"
                   />
+                  {errors.businessName && <span className="text-[10px] text-red-500 mt-1 block">{errors.businessName.message}</span>}
                 </div>
 
                 <div>
-                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Category</label>
+                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Category *</label>
                   <select 
-                    {...register("businessType", { required: true })}
-                    className="block w-full border-b border-black/10 bg-transparent py-4 focus:outline-none focus:border-black text-sm transition-colors cursor-pointer appearance-none"
+                    {...register("businessType", { required: "Category is required" })}
+                    className={`block w-full border-b ${errors.businessType ? 'border-red-500' : 'border-black/10'} bg-transparent py-4 focus:outline-none focus:border-black text-sm transition-colors cursor-pointer appearance-none`}
                   >
                     <option value="retail-core">Retail Core (Boutiques, shops)</option>
                     <option value="service-pro">Service Pro (Consultants, skilled trade)</option>
@@ -95,40 +101,47 @@ export function Onboarding({ onComplete }: { onComplete: (data: MarketplaceIntak
                     <option value="artisan-market">Artisan Market (Handmade, local)</option>
                     <option value="event-floral">Event & Floral (Florists, planners)</option>
                   </select>
+                  {errors.businessType && <span className="text-[10px] text-red-500 mt-1 block">{errors.businessType.message}</span>}
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">The Elevator Pitch</label>
+                <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">The Elevator Pitch *</label>
                 <textarea 
-                   {...register("offerings", { required: true })}
-                   rows={2}
-                   className="block w-full border border-black/10 bg-black/[0.02] p-4 focus:outline-none focus:border-black text-sm transition-colors resize-none"
+                   {...register("offerings", { required: "Please describe your offerings" })}
+                   rows={3}
+                   className={`block w-full border ${errors.offerings ? 'border-red-500' : 'border-black/10'} bg-black/[0.02] p-4 focus:outline-none focus:border-black text-sm transition-colors resize-none`}
                    placeholder="Describe what makes your products or services unique..."
                 />
+                {errors.offerings && <span className="text-[10px] text-red-500 mt-1 block">{errors.offerings.message}</span>}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Primary Goal</label>
+                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Primary Goal *</label>
                   <select 
-                    {...register("primaryGoal", { required: true })}
-                    className="block w-full border-b border-black/10 bg-transparent py-4 focus:outline-none focus:border-black text-sm transition-colors cursor-pointer appearance-none"
+                    {...register("primaryGoal", { required: "Primary goal is required" })}
+                    className={`block w-full border-b ${errors.primaryGoal ? 'border-red-500' : 'border-black/10'} bg-transparent py-4 focus:outline-none focus:border-black text-sm transition-colors cursor-pointer appearance-none`}
                   >
                      <option value="checkout">Direct Checkout (E-commerce)</option>
                      <option value="catalog">Display Catalog (Lead Gen)</option>
                      <option value="quote">Request a Quote</option>
                      <option value="booking">Book Appointments</option>
                   </select>
+                  {errors.primaryGoal && <span className="text-[10px] text-red-500 mt-1 block">{errors.primaryGoal.message}</span>}
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Contact Email</label>
+                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Contact Email *</label>
                   <input 
-                    {...register("contactEmail", { required: true })}
+                    {...register("contactEmail", { 
+                      required: "Email is required",
+                      pattern: { value: /^\S+@\S+$/i, message: "Invalid email format" }
+                    })}
                     type="email"
-                    className="block w-full border-b border-black/10 bg-transparent py-4 focus:outline-none focus:border-black text-sm transition-colors"
+                    className={`block w-full border-b ${errors.contactEmail ? 'border-red-500' : 'border-black/10'} bg-transparent py-4 focus:outline-none focus:border-black text-sm transition-colors`}
                     placeholder="hi@brand.com"
                   />
+                  {errors.contactEmail && <span className="text-[10px] text-red-500 mt-1 block">{errors.contactEmail.message}</span>}
                 </div>
               </div>
 

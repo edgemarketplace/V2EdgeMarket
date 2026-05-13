@@ -1,6 +1,16 @@
 import type { Config } from "@measured/puck";
 import { EdgeRootProps, TemplateFamily } from "../../lib/types";
-import * as Blocks from "./blocks";
+import * as Header from "./blocks/Header";
+import * as Hero from "./blocks/Hero";
+import * as Grid from "./blocks/Grid";
+import * as Story from "./blocks/Story";
+import * as Trust from "./blocks/Trust";
+import * as Media from "./blocks/Media";
+import * as Conversion from "./blocks/Conversion";
+import * as Footer from "./blocks/Footer";
+
+// Combine for easy access if needed, or use specific ones
+const Blocks = { ...Header, ...Hero, ...Grid, ...Story, ...Trust, ...Media, ...Conversion, ...Footer };
 
 type Props = {
   HeaderSimple: { title: string; navLinks?: { label: string; href: string }[] };
@@ -55,14 +65,36 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
       footers: { components: ["FooterBasic", "FooterCommerce", "FooterService"], title: "Footers" }
     },
     root: {
+      // @ts-ignore - We only want to expose specific fields in the root editor, not all of EdgeRootProps
+      fields: {
+        title: { type: "text" },
+        description: { type: "textarea" },
+        theme: {
+          type: "object",
+          objectFields: {
+            stylePreset: {
+              type: "select",
+              options: [
+                { label: "Milano (Luxury)", value: "milano" },
+                { label: "Standard (Modern)", value: "standard" },
+                { label: "Minimal (Clean)", value: "minimal" }
+              ]
+            },
+            primaryColor: { type: "text" },
+            fontFamily: { type: "text" },
+            borderRadius: { type: "text" }
+          }
+        }
+      },
       render: ({ children, ...props }) => {
+         const isMilano = props?.theme?.stylePreset === 'milano';
          return (
            <div 
             style={{ 
               ['--primary-color' as any]: props?.theme?.primaryColor,
               fontFamily: props?.theme?.fontFamily
             }} 
-            className="min-h-screen bg-[#F9F8F6] text-[#1A1A1A] font-sans flex flex-col"
+            className={`min-h-screen bg-[#F9F8F6] text-[#1A1A1A] flex flex-col ${isMilano ? 'milano-theme font-serif' : 'font-sans'}`}
           >
              {children}
            </div>
