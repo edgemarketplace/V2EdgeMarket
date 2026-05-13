@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-[#F9F8F6] text-[#1A1A1A] font-sans h-full m-0;
+  }
+  html {
+    @apply h-full m-0;
+  }
+}
