@@ -16,6 +16,7 @@ import {
   logger,
 } from '../../src/server/structured-logger';
 import { classifyFailure } from '../../src/lib/failure-classification';
+import { assertEnv, getMissingEnv } from '../../src/server/runtime/assertEnv';
 
 // Matches vercel.json crons schedule. 2 minutes is a good
 // balance between responsiveness and DB pressure.
@@ -38,6 +39,7 @@ console.log('[reconcile] module loaded', {
     SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     SUPABASE_ANON_KEY: Boolean(process.env.SUPABASE_ANON_KEY),
   },
+  missingRequiredEnv: getMissingEnv(['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']),
 });
 
 interface ReconcileResult {
@@ -91,6 +93,9 @@ export default async function handler(
       SUPABASE_ANON_KEY: Boolean(process.env.SUPABASE_ANON_KEY),
     },
   });
+
+  assertEnv(['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']);
+  console.log('[reconcile] env validated', { runId });
 
   // Set correlation context so all downstream operations are traced
   setCorrelationContext({
