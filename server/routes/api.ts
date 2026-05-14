@@ -364,4 +364,45 @@ router.get('/internal/deployments/status-counts', async (_req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════
+// Workflow state persistence endpoints (Priority 2)
+// ═══════════════════════════════════════════════════════════════════
+
+// GET /sites/:siteId/workflow — Get workflow state
+router.get('/sites/:siteId/workflow', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    const draft = await getMarketplaceDraftSnapshot(req.params.siteId);
+    if (!draft) {
+      res.status(404).json({ error: 'Draft not found.' });
+      return;
+    }
+    res.json({ workflowState: draft.workflowState || null });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// PUT /sites/:siteId/workflow — Update workflow state
+router.put('/sites/:siteId/workflow', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    const draft = await getMarketplaceDraftSnapshot(req.params.siteId);
+    if (!draft) {
+      res.status(404).json({ error: 'Draft not found.' });
+      return;
+    }
+    const workflowState = req.body?.workflowState;
+    if (!workflowState || typeof workflowState !== 'object') {
+      res.status(400).json({ error: 'workflowState object is required.' });
+      return;
+    }
+    draft.workflowState = workflowState;
+    const result = await saveMarketplaceDraftSnapshot(draft);
+    res.json({ workflowState: draft.workflowState, persisted: result.persisted });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
 export default router;

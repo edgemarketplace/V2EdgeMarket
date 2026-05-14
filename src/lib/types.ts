@@ -244,12 +244,30 @@ export interface PuckComponentPropsMap {
   };
 }
 
+export interface WorkflowBlocker {
+  code: string;
+  message: string;
+  cta?: {
+    label: string;
+    action: 'open_inventory' | 'configure_checkout' | 'resolve_blockers' | 'open_editor';
+  };
+}
+
+export interface WorkflowState {
+  currentStep: 'editor' | 'inventory' | 'checkout' | 'launch' | 'live';
+  completedSteps: ('editor' | 'inventory' | 'checkout' | 'launch' | 'live')[];
+  blockedReasons: WorkflowBlocker[];
+  lastTransitionAt?: string;
+  lastTransitionActor?: 'user' | 'system' | 'webhook';
+}
+
 export interface MarketplaceSiteDraft {
   siteId: string;
   slug: string;
   createdAt: string;
   updatedAt: string;
   status: SiteLifecycleStatus;
+  workflowState?: WorkflowState;
   selectedPlan?: LaunchPlan;
   intakeData: MarketplaceIntakeData;
   templateFamily: TemplateFamily;

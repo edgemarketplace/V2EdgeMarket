@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
+    "test": "vitest",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -46,6 +47,7 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "vitest": "^4.1.6"
   }
 }

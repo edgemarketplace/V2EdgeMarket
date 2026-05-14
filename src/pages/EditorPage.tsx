@@ -8,6 +8,7 @@ import { AiAssistant } from '../components/Editor/AiAssistant';
 import { WORKFLOW_STEPS } from '../lib/workflowSteps';
 import { getWorkflowBlockers, isCheckoutConfigured, WorkflowActionId, WorkflowBlocker } from '../lib/workflowActions';
 import { Layout, FileText, ShoppingBag, Mail, Home, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { navigate, useParams } from 'wouter';
 
 interface EditorPageProps {
   initialData: any;
@@ -27,6 +28,44 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
   const [activePage, setActivePage] = useState('home');
   const [validationResult, setValidationResult] = useState<any>(null);
   const [mobileAck, setMobileAck] = useState(false);
+  const { siteId } = useParams();
+  const [workflowState, setWorkflowState] = useState<any>(null);
+  const [workflowLoading, setWorkflowLoading] = useState(true);
+  
+  // Hydrate workflow state from API on load
+  useEffect(() => {
+    if (!siteId) return;
+    setWorkflowLoading(true);
+    fetch(`/api/sites/${siteId}/workflow`, {
+      headers: { 'x-site-token': localStorage.getItem(`site-token-${siteId}`) || '' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.workflowState) setWorkflowState(data.workflowState);
+        setWorkflowLoading(false);
+      })
+      .catch(err => {
+        console.warn('Failed to load workflow state:', err);
+        setWorkflowLoading(false);
+      });
+  }, [siteId]);
+  
+  const saveWorkflowState = (newState: any) => {
+    if (!siteId) return Promise.resolve();
+    return fetch(`/api/sites/${siteId}/workflow`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-site-token': localStorage.getItem(`site-token-${siteId}`) || ''
+      },
+      body: JSON.stringify({ workflowState: newState })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.workflowState) setWorkflowState(data.workflowState);
+        return data;
+      });
+  };
   
   const config = createPuckConfig(templateFamily);
 
@@ -163,6 +202,26 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
     }
 
     setActiveBlockers([]);
+
+    // Update workflow state
+    const newStep = action === 'preview' ? 'editor' : 
+                   action === 'inventory' ? 'inventory' :
+                   action === 'checkout' ? 'checkout' :
+                   action === 'launch' ? 'launch' : 'live';
+    
+    const newWorkflowState = {
+      ...workflowState,
+      currentStep: newStep,
+      completedSteps: [...(workflowState?.completedSteps || []), 'editor', 'inventory', 'checkout', 'launch', 'live'].filter((step, idx, arr) => {
+        const stepOrder = ['editor', 'inventory', 'checkout', 'launch', 'live'];
+        const newStepIdx = stepOrder.indexOf(newStep);
+        return stepOrder.indexOf(step) <= newStepIdx;
+      }),
+      lastTransitionAt: new Date().toISOString(),
+      lastTransitionActor: 'user' as const
+    };
+
+    saveWorkflowState(newWorkflowState);
 
     if (action === 'preview') {
       const ok = handlePublish();
@@ -318,7 +377,35 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
                 <p className="font-semibold uppercase tracking-[0.12em] text-[10px] mb-1">Action blocked</p>
                 <ul className="list-disc pl-4 space-y-1">
                   {activeBlockers.map((blocker) => (
-                    <li key={blocker.code}>{blocker.message}</li>
+                    <li key={blocker.code} className="flex items-center justify-between gap-2">
+                      <span>{blocker.message}</span>
+                      {blocker.cta && (
+                        <button
+                          onClick={() => {
+                            const { action } = blocker.cta!;
+                            switch (action) {
+                              case 'open_inventory':
+                                navigate(`/inventory/${siteId}`);
+                                break;
+                              case 'configure_checkout':
+                                navigate('/checkout');
+                                break;
+                              case 'resolve_blockers':
+                                navigate(`/editor/${siteId}`);
+                                break;
+                              case 'open_editor':
+                                navigate(`/editor/${siteId}`);
+                                break;
+                              default:
+                                break;
+                            }
+                          }}
+                          className="px-2 py-1 text-[10px] uppercase tracking-[0.12em] font-semibold rounded border border-amber-400 bg-amber-100 hover:bg-amber-200 transition-colors"
+                        >
+                          {blocker.cta.label}
+                        </button>
+                      )}
+                    </li>
                   ))}
                 </ul>
               </div>
