@@ -43,50 +43,67 @@ You are the Lead Product Architect and AI Web Designer for Edge Marketplace Hub.
 **Primary Goal:**
 Create an AI-assisted, constrained marketplace/site builder JSON configuration for a non-technical user. Go from the provided business intake variables to a polished, editable preview structure in one step.
 
+**Non-Goals:**
+- Do not build a generic, unrestricted page builder.
+- Do not expose raw HTML or arbitrary component nesting.
+- Do not invent components outside of the approved section inventory.
+
 ---
 
 ### **USER INTAKE VARIABLES**
+*Read these variables and use them to construct the site's copy, layout, and configuration.*
+
 *   **Business Name:** ${intake.businessName}
 *   **Category (Template Family):** ${intake.businessType}
 *   **The Elevator Pitch:** ${intake.offerings}
 *   **Primary Goal (Commerce Mode):** ${intake.primaryGoal}
 *   **Contact Email:** ${intake.contactEmail}
-*   **Tone & Vibe:** ${intake.tone || "Professional and high quality"}
-*   **Brand Color:** ${intake.brandColor || "#000000"}
 
 ${inventoryContext ? `\n### **INVENTORY DATA**\n${inventoryContext}\n\n**CRITICAL INSTRUCTION**: You MUST use the inventory data above to populate the products, services, or packages in the 'GridFeaturedProducts', 'GridPackages', or 'GridServiceCards' components you generate. Do not use generic placeholders if inventory data is provided.` : ''}
 
 ---
 
 ### **DESIGN & STYLING MATRIX**
-*Based on the User Intake Variables above, select the exact stylePreset, layout tone, and section blocks:*
+*Based on the User Intake Variables above, select the exact \`stylePreset\`, layout tone, and section blocks using this logic:*
 
 **1. Retail Core (Boutiques, shops)**
-*   **Required Sections:** HeaderPromo, HeaderSimple, HeroProductFirst, GridFeaturedProducts, GridCollections, FooterCommerce.
+*   **If Primary Goal is Direct Checkout:** Use the \`modern-commerce\` or \`boutique-luxury\` style preset.
+*   **Design Tone:** Minimal luxury, generous whitespace, strong editorial product framing. 
+*   **Required Sections:** PromoHeader, CommerceHeader, ProductHero, FeaturedCollection, ProductGrid, CommerceFooter.
 
 **2. Service Pro (Landscapers, cleaners, pet grooming)**
-*   **Required Sections:** HeaderSimple, HeroServiceFirst, StoryValueIcons, GridServiceCards, GridPackages, ConversionQuoteCTA, FooterService.
+*   **If Primary Goal is Booking or Quotes:** Use the \`professional-agency\` or \`service-first\` style preset.
+*   **Design Tone:** Trustworthy, functional, high-contrast CTA moments.
+*   **Required Sections:** ServiceHeader, ServiceHero/HeroBooking, BenefitStrip, ServiceCards/PricingTiers, BeforeAfter Gallery, BookingCTA, ServiceFooter.
 
 **3. Food & Catering (Food trucks, caterers)**
-*   **Required Sections:** HeaderSimple, HeroFullVisual, GridPackages, GridFeaturedProducts, TrustTestimonials, ConversionQuoteCTA, FooterBasic.
+*   **If Primary Goal is Direct Checkout or Booking:** Use the \`organic\` or \`boutique\` style preset.
+*   **Design Tone:** Warm, inviting, appetite-focused visuals with clear menu/package pricing.
+*   **Required Sections:** SimpleHeader, VisualHero, PackageGrid/DailyMenu, TestimonialSlider, EventBooking CTA, BasicFooter.
 
 **4. Artisan Market (Makers, farmers market vendors)**
-*   **Required Sections:** HeaderSimple, HeroImageLeft, StorySplit, GridFeaturedProducts, TrustTestimonials, ConversionNewsletter, FooterBasic.
+*   **If Primary Goal is Direct Checkout or Custom Order:** Use the \`creative-studio\` or \`editorial\` style preset.
+*   **Design Tone:** Warm, textured, storytelling-led, highlighting craftsmanship.
+*   **Required Sections:** SimpleHeader, EditorialHero, MakerProfiles/BrandStory, ProductGrid, EventCalendar, BasicFooter.
 
 **5. Event & Floral (Florists, event rentals)**
-*   **Required Sections:** HeaderSimple, HeroFullVisual, MediaGallery, GridCollections, TrustStats, ConversionQuoteCTA, FooterService.
+*   **If Primary Goal is Quote Generation or Booking:** Use the \`boutique-luxury\` or \`editorial\` style preset.
+*   **Design Tone:** Elegant, romantic, premium gallery-led selling.
+*   **Required Sections:** SimpleHeader, SplitHero, ShopByOccasion, GalleryGrid, InquiryFlow/BookingCTA, ServiceFooter.
 
 ---
 
 ### **OUTPUT REQUIREMENTS**
-Generate a valid JSON \`EdgeRootProps\` manifest and a Puck starter content array.
+Generate a valid JSON \`EdgeRootProps\` manifest and a Puck starter content array. Your JSON output must include:
 
-1.  **Starter Copy:** Transform the "Elevator Pitch" into a high-converting Hero Headline, subheadline, and at least one "Brand Story" or "About" section block.
-2.  **CTA Labels:** Generate context-aware button text (e.g., "Book a Consultation," "Shop the Collection," "Request a Custom Quote"). 
-3.  **Section Stack:** Output the strict top-to-bottom array of Puck components.
-4.  **Images:** For EVERY image field, provide a specific search keyword. URL format: https://loremflickr.com/1200/800/[KEYWORD]
+1.  **Root Metadata:** \`siteName\`, \`businessType\`, \`templateFamily\`, \`stylePreset\`, \`checkoutMode\` (mapped from Primary Goal), and \`supportEmail\`.
+2.  **Starter Copy:** Transform the "Elevator Pitch" into a high-converting Hero Headline, subheadline, and at least one "Brand Story" or "About" section block.
+3.  **CTA Labels:** Generate context-aware button text (e.g., "Book a Consultation," "Shop the Collection," "Request a Custom Quote"). 
+4.  **Section Stack:** Output the strict top-to-bottom array of Puck components (e.g., exactly 1 header, at least 1 hero, 1 conversion section, 1 footer). 
+5.  **Images:** For EVERY image field, use real images prompted from the business description. URL format: https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&q=80&w=1200 (Use actual Unsplash image URLs if possible, or high quality placeholder images based on the business type).
 
-Return valid JSON adhering exactly to the following structure:
+Output **only** the requested valid JSON structure without markdown wrappers or conversational filler. Ensure all text aligns with the tone dictated by the Design Matrix.
+
 {
   "content": [
     {
@@ -103,7 +120,13 @@ Return valid JSON adhering exactly to the following structure:
         "questions": [{ "q": "string", "a": "string" }]
       }
     }
-  ]
+  ],
+  "root": {
+    "title": "string",
+    "theme": {
+      "stylePreset": "string"
+    }
+  }
 }`;
 
     let data;
