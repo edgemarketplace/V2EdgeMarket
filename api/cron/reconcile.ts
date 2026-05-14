@@ -24,6 +24,22 @@ import { classifyFailure } from '../../src/lib/failure-classification';
 const STALLED_MINUTES = 2;
 const MAX_DEPLOYMENTS_PER_RUN = 25;
 
+// Stabilize runtime while investigating invocation failures.
+export const config = {
+  runtime: 'nodejs20.x',
+};
+
+console.log('[reconcile] module loaded', {
+  node: process.version,
+  runtime: 'nodejs20.x',
+  region: process.env.VERCEL_REGION || 'unknown',
+  envPresence: {
+    SUPABASE_URL: Boolean(process.env.SUPABASE_URL),
+    SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    SUPABASE_ANON_KEY: Boolean(process.env.SUPABASE_ANON_KEY),
+  },
+});
+
 interface ReconcileResult {
   deploymentId: string;
   siteId: string;
@@ -62,6 +78,19 @@ export default async function handler(
   const runId = crypto.randomUUID();
   const correlationId = crypto.randomUUID();
   const leaseHolder = `cron-${process.env.VERCEL_REGION || 'unknown'}-${runId.slice(0, 8)}`;
+
+  console.log('[reconcile] handler start', {
+    runId,
+    correlationId,
+    leaseHolder,
+    node: process.version,
+    region: process.env.VERCEL_REGION || 'unknown',
+    envPresence: {
+      SUPABASE_URL: Boolean(process.env.SUPABASE_URL),
+      SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      SUPABASE_ANON_KEY: Boolean(process.env.SUPABASE_ANON_KEY),
+    },
+  });
 
   // Set correlation context so all downstream operations are traced
   setCorrelationContext({
@@ -189,20 +218,41 @@ export default async function handler(
     }
   } catch (error) {
     const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    console.error('[reconcile] fatal', {
+      runId,
+      correlationId,
+      durationMs,
+      errorMessage,
+      errorStack,
+    });
+
     logger.error({
       event: 'cron_reconcile_error',
       reconcileRunId: runId,
       durationMs,
-      message: `Cron run failed: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Cron run failed: ${errorMessage}`,
       error,
     });
 
     res.status(500).json({
-      error: 'Reconciliation cron failed.',
-      message: error instanceof Error ? error.message : String(error),
+      error: 'RECONCILE_FATAL',
+      message: errorMessage,
+      stack: process.env.NODE_ENV !== 'production' ? errorStack : undefined,
       runId,
       correlationId,
       durationMs,
+      runtime: {
+        node: process.version,
+        region: process.env.VERCEL_REGION || 'unknown',
+      },
+      envPresence: {
+        SUPABASE_URL: Boolean(process.env.SUPABASE_URL),
+        SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+        SUPABASE_ANON_KEY: Boolean(process.env.SUPABASE_ANON_KEY),
+      },
     });
   } finally {
     clearCorrelationContext();
