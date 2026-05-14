@@ -180,7 +180,7 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
           <header className="p-8 border-b border-black/10 flex justify-between items-center bg-white">
               <div>
                 <h1 className="text-4xl font-serif italic tracking-tight leading-none text-[#1A1A1A]">
-                  {pages.find(p => p.id === activePage)?.label}
+                  {pageList.find(p => p.id === activePage)?.label}
                 </h1>
                 <p className="text-xs uppercase tracking-[0.2em] mt-2 font-semibold text-black/50">Editing: {rootProps.title}</p>
               </div>
