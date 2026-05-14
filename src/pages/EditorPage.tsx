@@ -8,7 +8,7 @@ import { AiAssistant } from '../components/Editor/AiAssistant';
 import { WORKFLOW_STEPS } from '../lib/workflowSteps';
 import { getWorkflowBlockers, isCheckoutConfigured, WorkflowActionId, WorkflowBlocker } from '../lib/workflowActions';
 import { Layout, FileText, ShoppingBag, Mail, Home, ChevronRight, Plus, Trash2 } from 'lucide-react';
-import { navigate, useParams } from 'wouter';
+import { useLocation, useParams } from 'wouter';
 
 interface EditorPageProps {
   initialData: any;
@@ -29,8 +29,10 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
   const [validationResult, setValidationResult] = useState<any>(null);
   const [mobileAck, setMobileAck] = useState(false);
   const { siteId } = useParams();
+  const [location, navigate] = useLocation();
   const [workflowState, setWorkflowState] = useState<any>(null);
   const [workflowLoading, setWorkflowLoading] = useState(true);
+  const [hydrationBlockers, setHydrationBlockers] = useState<string[]>([]);
   
   // Hydrate workflow state from API on load
   useEffect(() => {
@@ -47,6 +49,21 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
       .catch(err => {
         console.warn('Failed to load workflow state:', err);
         setWorkflowLoading(false);
+      });
+  }, [siteId]);
+
+  // Fetch hydration blockers from API
+  useEffect(() => {
+    if (!siteId) return;
+    fetch(`/api/sites/${siteId}/hydration-validation`, {
+      headers: { 'x-site-token': localStorage.getItem(`site-token-${siteId}`) || '' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.blockers) setHydrationBlockers(data.blockers);
+      })
+      .catch(err => {
+        console.warn('Failed to load hydration validation:', err);
       });
   }, [siteId]);
   
@@ -190,11 +207,12 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
     hasInventory: inventoryCount > 0,
     checkoutConfigured,
     hasPublishUrl: Boolean(publishUrl),
+    hydrationBlockers,
   });
 
   const [activeBlockers, setActiveBlockers] = useState<WorkflowBlocker[]>([]);
 
-  const executeAction = (action: WorkflowActionId) => {
+  const executeAction = async (action: WorkflowActionId) => {
     const actionBlockers = blockers[action] || [];
     if (actionBlockers.length) {
       setActiveBlockers(actionBlockers);
@@ -205,9 +223,9 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
 
     // Update workflow state
     const newStep = action === 'preview' ? 'editor' : 
-                   action === 'inventory' ? 'inventory' :
-                   action === 'checkout' ? 'checkout' :
-                   action === 'launch' ? 'launch' : 'live';
+                 action === 'inventory' ? 'inventory' : 
+                 action === 'checkout' ? 'checkout' : 
+                 action === 'launch' ? 'launch' : 'live';
     
     const newWorkflowState = {
       ...workflowState,
@@ -240,8 +258,47 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
     }
 
     if (action === 'launch') {
-      const ok = handlePublish();
-      if (ok) onOpenCheckout();
+      // Hydrate manifest at publish time
+      try {
+        const hydrateRes = await fetch(`/api/sites/${siteId}/hydrate-manifest`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-site-token': localStorage.getItem(`site-token-${siteId}`) || ''
+          },
+          body: JSON.stringify({})
+        });
+        const hydrateData = await hydrateRes.json();
+        
+        if (!hydrateData.success) {
+          alert(`Hydration failed: ${hydrateData.errors?.map((e: any) => e.message).join(', ')}`);
+          return;
+        }
+
+        // Persist storefront snapshot
+        const snapshotRes = await fetch(`/api/sites/${siteId}/persist-snapshot`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-site-token': localStorage.getItem(`site-token-${siteId}`) || ''
+          },
+          body: JSON.stringify({
+            hydratedManifest: hydrateData.hydratedManifest,
+            inventorySnapshot: hydrateData.hydratedManifest?.content || []
+          })
+        });
+        const snapshotData = await snapshotRes.json();
+        
+        if (!snapshotData.success) {
+          console.warn('Snapshot persistence failed:', snapshotData.error);
+        }
+
+        const ok = handlePublish();
+        if (ok) onOpenCheckout();
+      } catch (error) {
+        console.error('Launch hydration failed:', error);
+        alert('Launch preparation failed. Please try again.');
+      }
       return;
     }
 

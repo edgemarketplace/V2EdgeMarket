@@ -409,9 +409,27 @@ router.put('/sites/:siteId/workflow', async (req, res) => {
 // Cloudflare Subdomain Automation endpoints (Priority 5)
 // ═══════════════════════════════════════════════════════════════════
 
-import { reserveSubdomain, provisionDnsRecord, getSiteSubdomain } from '../../src/server/cloudflare';
+import { 
+  reserveSubdomain as reserveSubdomainLegacy, 
+  provisionDnsRecord as provisionDnsRecordLegacy, 
+  getSiteSubdomain 
+} from '../../src/server/cloudflare';
+import { 
+  reserveSubdomain, 
+  provisionDnsRecord, 
+  getProvisioningStatus,
+  retryProvisioning,
+  markAsActive,
+  getSubdomainState 
+} from '../../src/server/SubdomainProvisioningService';
+import {
+  hydrateManifest,
+  validateHydrationRequirements,
+  persistStorefrontSnapshot,
+  getStorefrontSnapshot,
+} from '../../src/server/inventoryHydration';
 
-// POST /api/sites/:siteId/reserve-subdomain — Reserve a subdomain
+// POST /api/sites/:siteId/reserve-subdomain — Reserve a subdomain (uses new service)
 router.post('/sites/:siteId/reserve-subdomain', async (req, res) => {
   try {
     if (!(await requireSiteAccess(req, res))) return;
@@ -429,7 +447,10 @@ router.post('/sites/:siteId/reserve-subdomain', async (req, res) => {
       return;
     }
 
-    res.status(201).json(result);
+    res.status(201).json({ 
+      ...result, 
+      message: 'Subdomain reserved. Call /provision-dns to create DNS record.' 
+    });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
@@ -440,33 +461,208 @@ router.get('/sites/:siteId/subdomain', async (req, res) => {
   try {
     if (!(await requireSiteAccess(req, res))) return;
     
-    const fullDomain = await getSiteSubdomain(req.params.siteId);
+    const state = await getSubdomainState(req.params.siteId);
     
-    if (!fullDomain) {
+    if (!state) {
       res.status(404).json({ error: 'No subdomain reserved for this site.' });
       return;
     }
 
-    res.json({ fullDomain });
+    res.json(state);
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
-// POST /api/sites/:siteId/provision-dns — Provision DNS via Cloudflare
+// POST /api/sites/:siteId/provision-dns — Provision DNS via Cloudflare (uses new service)
 router.post('/sites/:siteId/provision-dns', async (req, res) => {
   try {
     if (!(await requireSiteAccess(req, res))) return;
     
-    const fullDomain = await getSiteSubdomain(req.params.siteId);
-    if (!fullDomain) {
+    const state = await getSubdomainState(req.params.siteId);
+    if (!state) {
       res.status(400).json({ error: 'No subdomain reserved. Reserve one first.' });
       return;
     }
 
-    const subdomain = fullDomain.split('.')[0];
-    const result = await provisionDnsRecord(subdomain);
+    const result = await provisionDnsRecord(state.subdomain);
     
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// GET /api/sites/:siteId/provisioning-status — Get provisioning status (for Launch workflow)
+router.get('/sites/:siteId/provisioning-status', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    
+    const status = await getProvisioningStatus(req.params.siteId);
+    
+    if (!status) {
+      res.status(404).json({ error: 'No subdomain provisioning in progress.' });
+      return;
+    }
+
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// POST /api/sites/:siteId/retry-provisioning — Retry failed DNS provisioning
+router.post('/sites/:siteId/retry-provisioning', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    
+    const result = await retryProvisioning(req.params.siteId);
+    
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// POST /api/sites/:siteId/mark-active — Mark provisioning as active (after DNS verification)
+router.post('/sites/:siteId/mark-active', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    
+    const state = await getSubdomainState(req.params.siteId);
+    if (!state) {
+      res.status(404).json({ error: 'No subdomain found.' });
+      return;
+    }
+
+    const success = await markAsActive(state.subdomain);
+    
+    if (!success) {
+      res.status(500).json({ error: 'Failed to mark as active.' });
+      return;
+    }
+
+    res.json({ success: true, status: 'active' });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Inventory Hydration endpoints (Priority B)
+// ═══════════════════════════════════════════════════════════════════
+
+// GET /api/sites/:siteId/hydration-validation — Validate hydration requirements (for workflow blockers)
+router.get('/sites/:siteId/hydration-validation', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+
+    const draft = await getMarketplaceDraftSnapshot(req.params.siteId);
+    if (!draft) {
+      res.status(404).json({ error: 'Draft not found.' });
+      return;
+    }
+
+    const result = await validateHydrationRequirements(req.params.siteId, draft.puckData);
+    
+    res.json({
+      valid: result.valid,
+      blockers: result.blockers,
+      siteId: req.params.siteId,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// POST /api/sites/:siteId/hydrate-manifest — Hydrate manifest at publish time
+router.post('/sites/:siteId/hydrate-manifest', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+
+    const draft = await getMarketplaceDraftSnapshot(req.params.siteId);
+    if (!draft) {
+      res.status(404).json({ error: 'Draft not found.' });
+      return;
+    }
+
+    const result = await hydrateManifest(req.params.siteId, draft.puckData);
+    
+    res.json({
+      success: result.success,
+      hydratedManifest: result.hydratedManifest,
+      errors: result.errors,
+      warnings: result.warnings,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// GET /api/sites/:siteId/snapshots — List storefront snapshots
+router.get('/sites/:siteId/snapshots', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      res.status(500).json({ error: 'Supabase not configured' });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('storefront_snapshots')
+      .select('snapshot_id, published_at, metadata')
+      .eq('site_id', req.params.siteId)
+      .order('published_at', { ascending: false });
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({ snapshots: data });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// GET /api/sites/:siteId/snapshots/:snapshotId — Get specific snapshot
+router.get('/sites/:siteId/snapshots/:snapshotId', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+
+    const snapshot = await getStorefrontSnapshot(req.params.siteId, req.params.snapshotId);
+    
+    if (!snapshot) {
+      res.status(404).json({ error: 'Snapshot not found.' });
+      return;
+    }
+
+    res.json(snapshot);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// POST /api/sites/:siteId/persist-snapshot — Persist storefront snapshot at publish time
+router.post('/sites/:siteId/persist-snapshot', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+
+    const { hydratedManifest, inventorySnapshot } = req.body;
+
+    if (!hydratedManifest || !inventorySnapshot) {
+      res.status(400).json({ error: 'Missing hydratedManifest or inventorySnapshot in request body.' });
+      return;
+    }
+
+    const result = await persistStorefrontSnapshot(
+      req.params.siteId,
+      hydratedManifest,
+      inventorySnapshot
+    );
+
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });

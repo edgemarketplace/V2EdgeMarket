@@ -10,6 +10,8 @@ import crypto from 'node:crypto';
 
 interface CloudflareConfig {
   apiToken: string;
+  apiKey?: string; // Global API Key fallback
+  apiEmail?: string; // Email for Global Key auth
   zoneId: string;
   domain: string; // e.g., 'edge-marketplace.com'
 }
@@ -28,12 +30,15 @@ interface SubdomainReservation {
  */
 function getCloudflareConfig(): CloudflareConfig | null {
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+  const apiKey = process.env.CLOUDFLARE_API_KEY;
+  const apiEmail = process.env.CLOUDFLARE_API_EMAIL || 'Donald@edgemarketplacehub.com';
   const zoneId = process.env.CLOUDFLARE_ZONE_ID;
   const domain = process.env.CLOUDFLARE_DOMAIN || 'edge-marketplace.com';
 
-  if (!apiToken || !zoneId) return null;
+  if (!apiToken && !apiKey) return null;
+  if (!zoneId) return null;
 
-  return { apiToken, zoneId, domain };
+  return { apiToken, apiKey, apiEmail, zoneId, domain };
 }
 
 /**
@@ -133,18 +138,28 @@ export async function provisionDnsRecord(
   }
 
   try {
+    // Build headers - prefer Global API Key (Super Admin) over Bearer token
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (config.apiKey) {
+      headers['X-Auth-Key'] = config.apiKey;
+      headers['X-Auth-Email'] = config.apiEmail || 'Donald@edgemarketplacehub.com';
+    } else {
+      headers['Authorization'] = `Bearer ${config.apiToken}`;
+    }
+
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/zones/${config.zoneId}/dns/records`,
       {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${config.apiToken}`,          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           type: 'CNAME',
           name: subdomain,
           content: targetIp,
-          proxied: true, // Orange cloud = true
+          proxied: true // Orange cloud = true
         }),
       }
     );

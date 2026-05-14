@@ -18,7 +18,8 @@ create table if not exists marketplaces (
   status text default 'draft',
   owner_token_hash text not null,
   draft_snapshot jsonb,
-  deployment_state jsonb
+  deployment_state jsonb,
+  latest_snapshot_id text references storefront_snapshots(snapshot_id)
 );
 
 create table if not exists inventory_items (
@@ -85,3 +86,17 @@ create table if not exists subdomain_reservations (
   reserved_at timestamptz not null default now(),
   provisioned_at timestamptz
 );
+
+create table if not exists storefront_snapshots (
+  id serial primary key,
+  snapshot_id text unique not null,
+  site_id uuid not null references marketplaces(id) on delete cascade,
+  published_at timestamptz not null default now(),
+  manifest jsonb not null,
+  inventory_snapshot jsonb not null,
+  metadata jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_storefront_snapshots_site_id on storefront_snapshots(site_id);
+create index if not exists idx_storefront_snapshots_published_at on storefront_snapshots(published_at desc);
