@@ -14,8 +14,8 @@ const Blocks = { ...Header, ...Hero, ...Grid, ...Story, ...Trust, ...Media, ...C
 
 type Props = {
   HeaderSimple: { title: string; navLinks?: { label: string; href: string }[] };
-  HeaderPromo: { promoText: string; title: string };
-  HeaderMega: { title: string };
+  HeaderPromo: { promoText: string; title: string; navLinks?: { label: string; href: string }[] };
+  HeaderMega: { title: string; navLinks?: { label: string; href: string }[] };
   HeroImageLeft: { heading: string; subheading: string; ctaText?: string; image?: string };
   HeroFullVisual: { heading: string; subheading: string; ctaText?: string; padding?: "normal" | "large"; image?: string };
   HeroProductFirst: { heading: string; price: string; ctaText?: string; image?: string };
@@ -123,13 +123,20 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
         render: (props: any) => <Blocks.HeaderSimple {...props} />
       },
       HeaderPromo: {
-        fields: { promoText: { type: "text" }, title: { type: "text" } },
-        defaultProps: { promoText: "Free shipping on orders over $50", title: "Brand" },
+        fields: { 
+          promoText: { type: "text" }, 
+          title: { type: "text" },
+          navLinks: { type: "array", arrayFields: { label: { type: "text" }, href: { type: "text" } } }
+        },
+        defaultProps: { promoText: "Free shipping on orders over $50", title: "Brand", navLinks: [{ label: "Home", href: "#" }] },
         render: (props: any) => <Blocks.HeaderPromo {...props} />
       },
       HeaderMega: {
-        fields: { title: { type: "text" } },
-        defaultProps: { title: "Brand" },
+        fields: { 
+          title: { type: "text" },
+          navLinks: { type: "array", arrayFields: { label: { type: "text" }, href: { type: "text" } } }
+        },
+        defaultProps: { title: "Brand", navLinks: [{ label: "Home", href: "#" }] },
         render: (props: any) => <Blocks.HeaderMega {...props} />
       },
       

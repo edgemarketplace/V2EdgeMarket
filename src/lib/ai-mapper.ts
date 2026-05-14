@@ -319,6 +319,14 @@ function createSection(sectionId: string, commonId: string, intake: MarketplaceI
   }
 }
 
+const PAGE_PRESETS: Record<string, string[]> = {
+  home: ["HeaderSimple", "HeroFullVisual", "GridFeaturedProducts", "StorySplit", "TrustReviews", "FooterCommerce"],
+  about: ["HeaderSimple", "StoryFounder", "StoryEditorialBand", "StoryValueIcons", "FooterCommerce"],
+  products: ["HeaderSimple", "GridCollections", "GridFeaturedProducts", "ConversionFAQ", "FooterCommerce"],
+  "product-detail": ["HeaderSimple", "GridProductDetail", "GridFeaturedProducts", "ConversionNewsletter", "FooterCommerce"],
+  contact: ["HeaderSimple", "HeroServiceFirst", "ConversionQuoteCTA", "FooterService"]
+};
+
 export function mapIntakeToPuckConfig(intake: MarketplaceIntakeData) {
   const templateConfig = TEMPLATE_MANIFESTS[intake.businessType];
 
@@ -350,15 +358,38 @@ export function mapIntakeToPuckConfig(intake: MarketplaceIntakeData) {
     },
   };
 
-  const starterContent = templateConfig.recommendedStack.map((sectionId, index) =>
-    createSection(sectionId, `${sectionId}-${index}`, intake),
-  );
+  const generatePageContent = (stack: string[]) => {
+    return stack.map((sectionId, index) =>
+      createSection(sectionId, `${sectionId}-${index}-${Math.random().toString(36).substring(2, 7)}`, intake)
+    );
+  };
+
+  const siteData: Record<string, any> = {};
+  
+  // Generate content for each preset page
+  Object.entries(PAGE_PRESETS).forEach(([pageKey, stack]) => {
+    const pageContent = generatePageContent(stack);
+    
+    // Inject correct nav links for this page
+    const header = pageContent.find(c => c.type.startsWith('Header'));
+    if (header) {
+      header.props.navLinks = [
+        { label: 'Home', href: '/home' },
+        { label: 'About', href: '/about' },
+        { label: 'Shop', href: '/products' },
+        { label: 'Contact', href: '/contact' },
+      ];
+    }
+
+    siteData[pageKey] = {
+      content: pageContent,
+      root: { props: rootProps }
+    };
+  });
 
   return {
     rootProps,
-    initialData: {
-      content: starterContent,
-      root: { props: rootProps },
-    },
+    siteData,
+    initialData: siteData['home'],
   };
 }

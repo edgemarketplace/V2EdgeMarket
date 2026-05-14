@@ -111,10 +111,8 @@ export default function App() {
           }
         });
       } else {
-        // Fallback to base config for home page
-        siteContent = {
-          home: baseConfig.initialData
-        };
+        // Use our robust local multi-page presets if AI generation fails
+        siteContent = baseConfig.siteData;
       }
       
       setEditorState({
@@ -132,6 +130,7 @@ export default function App() {
       const mappedConfig = mapIntakeToPuckConfig(data);
       setEditorState({
         initialData: mappedConfig.initialData,
+        puckContent: mappedConfig.siteData,
         templateFamily: data.businessType,
         rootProps: mappedConfig.rootProps,
       });

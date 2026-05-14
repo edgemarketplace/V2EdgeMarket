@@ -5,7 +5,7 @@ import { createPuckConfig } from '../components/puck/config';
 import { EdgeRootProps, TemplateFamily } from '../lib/types';
 import { validateEditorContent } from '../lib/validation';
 import { AiAssistant } from '../components/Editor/AiAssistant';
-import { Layout, FileText, ShoppingBag, Mail, Home, ChevronRight } from 'lucide-react';
+import { Layout, FileText, ShoppingBag, Mail, Home, ChevronRight, Plus, Trash2 } from 'lucide-react';
 
 interface EditorPageProps {
   initialData: any;
@@ -23,8 +23,63 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
   
   const config = createPuckConfig(templateFamily);
 
+  const [pageList, setPageList] = useState(
+    Object.keys(puckContent).length > 0 
+      ? Object.keys(puckContent).map(key => ({
+          id: key,
+          label: key.charAt(0).toUpperCase() + key.slice(1).replace(/-/g, ' '),
+          icon: key === 'home' ? Home : key === 'about' ? FileText : key === 'products' ? ShoppingBag : key === 'contact' ? Mail : Layout
+        }))
+      : [
+          { id: 'home', label: 'Homepage', icon: Home },
+          { id: 'about', label: 'About Us', icon: FileText },
+          { id: 'products', label: 'Products', icon: ShoppingBag },
+          { id: 'contact', label: 'Contact', icon: Mail },
+        ]
+  );
+
   const handlePageChange = (newPage: string) => {
     setActivePage(newPage);
+  };
+
+  const addPage = () => {
+    const name = prompt("Enter page name (e.g. Services, FAQ):");
+    if (!name) return;
+
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (pageList.find(p => p.id === id)) {
+      alert("A page with this name already exists.");
+      return;
+    }
+
+    const newPage = { id, label: name, icon: Layout };
+    setPageList([...pageList, newPage]);
+    setSiteData(prev => ({
+      ...prev,
+      [id]: { content: [], root: { props: {} } }
+    }));
+    setActivePage(id);
+  };
+
+  const deletePage = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (id === 'home') {
+      alert("The homepage cannot be deleted.");
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete the "${id}" page?`)) return;
+
+    setPageList(prev => prev.filter(p => p.id !== id));
+    setSiteData(prev => {
+      const newData = { ...prev };
+      delete newData[id];
+      return newData;
+    });
+
+    if (activePage === id) {
+      setActivePage('home');
+    }
   };
 
   const updateActivePageData = (newData: any) => {
@@ -35,7 +90,7 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
   };
 
   const handlePublish = () => {
-    const homePageData = siteData['home'];
+    const homePageData = siteData['home'] || Object.values(siteData)[0];
     
     const updatedData = {
       ...homePageData,
@@ -66,28 +121,30 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
     }
   };
 
-  const pages = [
-    { id: 'home', label: 'Homepage', icon: Home },
-    { id: 'about', label: 'About Us', icon: FileText },
-    { id: 'products', label: 'Products', icon: ShoppingBag },
-    { id: 'contact', label: 'Contact', icon: Mail },
-  ];
-
   return (
     <div className="h-screen w-full flex bg-[#F9F8F6] font-sans border-8 border-white box-border overflow-hidden">
        {/* Sidebar for Page Switching */}
        <aside className="w-64 border-r border-black/10 bg-white flex flex-col">
-          <div className="p-8 border-b border-black/10">
-            <h2 className="text-xl font-serif italic tracking-tight">Site Structure</h2>
-            <p className="text-[10px] uppercase tracking-widest text-black/40 mt-1 font-bold">Multi-Page Editor</p>
+          <div className="p-8 border-b border-black/10 flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-serif italic tracking-tight">Structure</h2>
+              <p className="text-[10px] uppercase tracking-widest text-black/40 mt-1 font-bold">Multi-Page</p>
+            </div>
+            <button 
+              onClick={addPage}
+              className="w-8 h-8 rounded-full border border-black/10 flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-sm"
+              title="Add Page"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
           
-          <nav className="flex-1 p-4 space-y-2">
-            {pages.map((page) => (
+          <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+            {pageList.map((page) => (
               <button
                 key={page.id}
                 onClick={() => handlePageChange(page.id)}
-                className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${
+                className={`w-full group flex items-center justify-between p-4 rounded-2xl transition-all ${
                   activePage === page.id 
                   ? 'bg-black text-white shadow-xl shadow-black/10' 
                   : 'hover:bg-black/5 text-black/60'
@@ -97,7 +154,18 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
                   <page.icon className={`w-4 h-4 ${activePage === page.id ? 'text-white' : 'text-black/40'}`} />
                   <span className="text-sm font-bold tracking-tight">{page.label}</span>
                 </div>
-                {activePage === page.id && <ChevronRight className="w-4 h-4" />}
+                <div className="flex items-center">
+                  {page.id !== 'home' && (
+                    <div 
+                      onClick={(e) => deletePage(page.id, e)}
+                      className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all ${activePage === page.id ? 'text-white/40' : 'text-black/20'}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+                  {activePage === page.id && page.id === 'home' && <ChevronRight className="w-4 h-4" />}
+                  {activePage === page.id && page.id !== 'home' && <ChevronRight className="w-4 h-4 ml-1" />}
+                </div>
               </button>
             ))}
           </nav>
