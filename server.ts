@@ -13,6 +13,11 @@ async function startServer() {
   // API routes
   app.use("/api", apiRouter);
 
+  // Catch unmatched API routes BEFORE Vite middleware — return 404 JSON, not SPA HTML
+  app.use("/api/*", (req, res) => {
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
