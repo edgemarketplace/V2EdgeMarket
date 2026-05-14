@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Send, Loader2, X, MessageSquare } from 'lucide-react';
+import { safeFetchJson } from '../../lib/http';
 
 interface AiAssistantProps {
   currentData: any;
@@ -22,7 +23,7 @@ export function AiAssistant({ currentData, businessDetails, onUpdate }: AiAssist
     setError(null);
 
     try {
-      const response = await fetch('/api/edit-page', {
+      const newData = await safeFetchJson<any>('/api/edit-page', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -32,11 +33,6 @@ export function AiAssistant({ currentData, businessDetails, onUpdate }: AiAssist
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to process AI instruction');
-      }
-
-      const newData = await response.json();
       onUpdate(newData);
       setInstruction('');
       // Keep open so they can see the change or ask for more

@@ -77,19 +77,21 @@ function requireWebhookSecret(req: any, res: any) {
 }
 
 // Phase 4: Correlation context middleware — runs on every API request
-router.use((req: any, _res: any, next: any) => {
+router.use((req: any, res: any, next: any) => {
   const correlationId = (req.headers['x-correlation-id'] as string) || generateCorrelationId();
   const requestId = (req.headers['x-request-id'] as string) || `req-${correlationId.slice(0, 8)}`;
+  res.setHeader('x-runtime-owner', 'express-api-router');
+  res.setHeader('x-correlation-id', correlationId);
   setCorrelationContext({
     correlationId,
     requestId,
     siteId: req.params?.siteId,
   });
   // Clear context after response to prevent leaks
-  const origEnd = _res.end;
-  _res.end = (...args: any[]) => {
+  const origEnd = res.end;
+  res.end = (...args: any[]) => {
     clearCorrelationContext();
-    return origEnd.apply(_res, args);
+    return origEnd.apply(res, args);
   };
   next();
 });

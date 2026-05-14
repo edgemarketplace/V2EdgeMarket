@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Globe, Rocket, Zap } from 'lucide-react';
 import { DeploymentRecord, InventoryItem, LaunchPlan, MarketplaceSiteDraft } from '../lib/types';
 import { buildSiteHeaders } from '../lib/siteDrafts';
+import { safeFetchJson } from '../lib/http';
 
 export function CheckoutPage({
   draft,
@@ -37,19 +38,11 @@ export function CheckoutPage({
 
     try {
       // Ensure server-side site exists before deploying
-      const siteRes = await fetch('/api/sites', {
+      const serverSite = await safeFetchJson<any>('/api/sites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft.intakeData),
       });
-
-      if (!siteRes.ok) {
-        const text = await siteRes.text();
-        throw new Error(text || `Site creation failed with ${siteRes.status}`);
-      }
-
-      const siteResText = await siteRes.text();
-      const serverSite = siteResText ? JSON.parse(siteResText) : {};
       const siteId = serverSite.siteId || draft.siteId;
       const siteToken = serverSite.siteToken || draft.siteToken;
 
@@ -66,7 +59,7 @@ export function CheckoutPage({
         });
       }
 
-      const response = await fetch(`/api/sites/${siteId}/deploy`, {
+      const deployment = await safeFetchJson<any>(`/api/sites/${siteId}/deploy`, {
         method: 'POST',
         headers: {
           ...buildSiteHeaders(siteToken || draft.siteToken),
@@ -81,14 +74,6 @@ export function CheckoutPage({
           idempotencyKey,
         }),
       });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || `Server returned ${response.status}`);
-      }
-
-      const deploymentText = await response.text();
-      const deployment = deploymentText ? JSON.parse(deploymentText) : {};
       onComplete(selectedPlan, deployment);
     } catch (launchError) {
       console.error(launchError);

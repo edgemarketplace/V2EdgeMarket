@@ -12,6 +12,7 @@ import { SiteRenderer } from './pages/SiteRenderer';
 import { mapIntakeToPuckConfig } from './lib/ai-mapper';
 import { marketplaceService } from './lib/marketplaceService';
 import { EdgeRootProps, TemplateFamily, MarketplaceIntakeData } from './lib/types';
+import { safeFetchJson } from './lib/http';
 
 const VALID_COMPONENT_TYPES = new Set([
   'HeaderSimple', 'HeaderPromo', 'HeaderMega',
@@ -94,20 +95,18 @@ export default function App() {
       // Save to Supabase (optional/background)
       marketplaceService.saveMarketplace(data).catch(err => console.warn("Supabase save failed", err));
 
-      const response = await fetch('/api/generate-page', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      
       let siteContent: { [key: string]: any } = {};
       const baseConfig = mapIntakeToPuckConfig(data);
-      
-      if (response.ok) {
-        const aiData = await response.json();
+
+      try {
+        const aiData = await safeFetchJson<any>('/api/generate-page', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
         // aiData is now { home: {...}, about: {...}, ... }
         siteContent = aiData;
-        
+
         // Ensure all pages have IDs
         Object.keys(siteContent).forEach(pageKey => {
           if (siteContent[pageKey].content) {
@@ -132,7 +131,8 @@ export default function App() {
             }
           }
         });
-      } else {
+      } catch (apiError) {
+        console.warn('AI generate-page unavailable, falling back to local presets', apiError);
         // Use our robust local multi-page presets if AI generation fails
         siteContent = baseConfig.siteData;
       }
