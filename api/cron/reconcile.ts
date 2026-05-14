@@ -2,7 +2,7 @@
 // Goal: prove function execution in Vercel without external import graph.
 
 export const config = {
-  runtime: 'nodejs20.x',
+  runtime: 'nodejs',
 };
 
 export default async function handler(_req: any, res: any) {
