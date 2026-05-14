@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.2.0",
+  "deployGateVersion": "1",
+  "deploymentVerdict": "BLOCK",
+  "deploymentConfidence": 0.05,
+  "confidenceBand": "INVALID",
+  "incidentSeverity": "critical",
+  "rollbackRecommended": true,
+  "rollbackReason": "ROUTING_SURFACE_INTERCEPTION",
+  "environment": "production",
+  "baseUrl": "https://www.edgemarketplacehub.com",
+  "deploymentId": "",
+  "gateRunId": "",
+  "checks": {
+    "probeExecution": "FAIL",
+    "htmlLeakage": "FAIL",
+    "runtimeInfo": "FAIL",
+    "provenance": "SKIP",
+    "cronExecution": "WARN",
+    "routingSurface": "FAIL"
+  },
+  "incidentClass": [
+    "ROUTING_SURFACE_INTERCEPTION",
+    "HTML_LEAKAGE",
+    "ROUTING_FAILURE",
+    "PROBE_HEADER_MISSING",
+    "PROBE_NOT_JSON",
+    "RUNTIME_EXCEPTION",
+    "RUNTIME_INFO_FAILURE",
+    "RUNTIME_INFO_NOT_JSON",
+    "PROBE_EXECUTION_FAILURE"
+  ],
+  "warnings": [
+    "cron reconcile runtime exception"
+  ],
+  "info": []
+}
