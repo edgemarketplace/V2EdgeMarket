@@ -1,0 +1,71 @@
+name: post-deploy-gate-auto
+
+on:
+  deployment_status:
+
+jobs:
+  deploy-gate-auto:
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'production'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve base URL
+        id: resolve
+        env:
+          EVENT_URL: ${{ github.event.deployment_status.environment_url }}
+          PROD_BASE_URL: ${{ vars.PROD_BASE_URL }}
+        run: |
+          if [ -n "$EVENT_URL" ]; then
+            echo "base_url=$EVENT_URL" >> "$GITHUB_OUTPUT"
+          elif [ -n "$PROD_BASE_URL" ]; then
+            echo "base_url=$PROD_BASE_URL" >> "$GITHUB_OUTPUT"
+          else
+            echo "base_url=https://www.edgemarketplacehub.com" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Make scripts executable
+        run: chmod +x scripts/check-live-api-signature.sh scripts/check-live-routing-surface.sh scripts/deploy-gate.sh
+
+      - name: Run deploy gate
+        id: gate
+        env:
+          GATE_JSON_OUT: gate-verdict.json
+          DEPLOYMENT_ID: ${{ github.event.deployment.id }}
+          GATE_RUN_ID: ${{ github.run_id }}
+        run: |
+          set +e
+          scripts/deploy-gate.sh "${{ steps.resolve.outputs.base_url }}" production "${{ github.sha }}" | tee gate-output.log
+          ec=${PIPESTATUS[0]}
+          echo "exit_code=$ec" >> "$GITHUB_OUTPUT"
+          set -e
+          exit $ec
+
+      - name: Upload gate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-gate-auto-${{ github.run_id }}
+          path: |
+            gate-verdict.json
+            gate-output.log
+          if-no-files-found: warn
+
+      - name: Summarize gate verdict
+        if: always()
+        run: |
+          echo "## Auto Post-Deploy Gate Verdict" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployment ID: ${{ github.event.deployment.id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Gate Run ID: ${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Base URL: ${{ steps.resolve.outputs.base_url }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f gate-verdict.json ]; then
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat gate-verdict.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "gate-verdict.json missing" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "Exit code: ${{ steps.gate.outputs.exit_code || 'n/a' }}" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,62 @@
+name: post-deploy-gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Live base URL to verify"
+        required: true
+        default: "https://www.edgemarketplacehub.com"
+      environment:
+        description: "Environment label"
+        required: true
+        default: "production"
+      expected_sha:
+        description: "Expected commit SHA/prefix for provenance check (optional)"
+        required: false
+        default: ""
+
+jobs:
+  deploy-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Make scripts executable
+        run: chmod +x scripts/check-live-api-signature.sh scripts/check-live-routing-surface.sh scripts/deploy-gate.sh
+
+      - name: Run deploy gate
+        id: gate
+        env:
+          GATE_JSON_OUT: gate-verdict.json
+        run: |
+          set +e
+          scripts/deploy-gate.sh "${{ inputs.base_url }}" "${{ inputs.environment }}" "${{ inputs.expected_sha }}" | tee gate-output.log
+          ec=${PIPESTATUS[0]}
+          echo "exit_code=$ec" >> "$GITHUB_OUTPUT"
+          set -e
+          exit $ec
+
+      - name: Upload gate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-gate-${{ github.run_id }}
+          path: |
+            gate-verdict.json
+            gate-output.log
+          if-no-files-found: warn
+
+      - name: Summarize gate verdict
+        if: always()
+        run: |
+          echo "## Deploy Gate Verdict" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f gate-verdict.json ]; then
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat gate-verdict.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "gate-verdict.json missing" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "Exit code: ${{ steps.gate.outputs.exit_code || 'n/a' }}" >> "$GITHUB_STEP_SUMMARY"
