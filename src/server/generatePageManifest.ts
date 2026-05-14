@@ -22,31 +22,60 @@ function buildInventoryContext(intake: MarketplaceIntakeData) {
 }
 
 function buildPrompt(intake: MarketplaceIntakeData) {
-  return `You are Edge Marketplace Hub's storefront architect.
-Return ONLY valid JSON with this shape:
+  return `**System Prompt: Edge Marketplace Hub — AI Multi-Page Architect**
+
+You are the Lead Architect for Edge Marketplace Hub. Your job is to convert a user's intake form into a FULL MULTI-PAGE production-ready Puck Editor site manifest.
+
+**REQUIRED PAGES:**
+1.  **home**: The landing page.
+2.  **about**: Company story, mission, and team.
+3.  **products**: Full listing of products/services.
+4.  **contact**: Inquiry forms, map, and contact details.
+
+**PRIMARY GOAL:**
+Create a cohesive site structure with inter-linked navigation.
+
+---
+
+### **USER INTAKE VARIABLES**
+*   **Business Name:** ${intake.businessName}
+*   **Category:** ${intake.businessType}
+*   **Offerings:** ${intake.offerings}
+*   **Primary Goal:** ${intake.primaryGoal}
+*   **Creative Direction:** ${(intake.tone || []).join(', ')}
+
+---
+
+### **DESIGN DIRECTION**
+You MUST influence the visual style and component selection based on the **Creative Direction** selected:
+- **Minimalist**: Use "minimal" stylePreset, generous whitespace, thin borders.
+- **Luxury**: Use "milano" stylePreset, serif fonts, high-contrast black/white.
+- **Bold**: High-impact headlines, vibrant accents.
+- **Dark Mode**: Use "dark" accents and dark backgrounds where possible.
+- **Industrial**: Raw textures, monospaced accents, structural layouts.
+
+If multiple are selected, find a sophisticated blend (e.g., "Minimal Luxury" or "Bold Industrial").
+
+---
+
+### **OUTPUT REQUIREMENTS**
+Generate a JSON object where the keys are the page paths ("home", "about", "products", "contact") and the values are Puck data objects.
+
+Each Puck data object MUST have:
+1.  **content**: Array of Puck components.
+2.  **root**: { props: { title, ... } }
+
+**NAVIGATION REQUIREMENT:**
+Every "Header" component in every page MUST have navLinks that point to the other pages (e.g., href: "/home", href: "/about", etc.).
+
+**OUTPUT ONLY VALID JSON.**
+
 {
-  "content": [{ "type": "string", "props": {} }],
-  "root": { "title": "string", "theme": { "stylePreset": "milano|standard|minimal" } }
-}
-
-Business name: ${intake.businessName}
-Template family: ${intake.businessType}
-Offerings: ${intake.offerings}
-Primary goal: ${intake.primaryGoal}
-Tone: ${intake.tone || 'professional'}
-Brand color: ${intake.brandColor || 'default'}
-Contact email: ${intake.contactEmail || 'unknown'}
-Service area: ${intake.serviceArea || 'not provided'}
-Inventory context:
-${buildInventoryContext(intake)}
-
-Hard rules:
-- Use ONLY these component type strings: HeaderSimple, HeaderPromo, HeaderMega, HeroImageLeft, HeroFullVisual, HeroProductFirst, HeroServiceFirst, GridFeaturedProducts, GridCollections, GridServiceCards, GridPackages, StorySplit, StoryValueIcons, StoryEditorialBand, StoryFounder, TrustReviews, TrustTestimonials, TrustLogos, TrustStats, MediaGallery, MediaVideo, MediaBeforeAfter, ConversionFAQ, ConversionNewsletter, ConversionQuoteCTA, ConversionStickyPromo, FooterBasic, FooterCommerce, FooterService.
-- Build an inventory-first funnel: establish trust, show products/services, then conversion.
-- Use CTA labels that match the primary goal.
-- If inventory is present, populate relevant grid/package components with real-looking structured items.
-- root.theme.stylePreset must be one of milano, standard, minimal.
-- Do not return markdown or commentary.`;
+  "home": { "content": [...], "root": {...} },
+  "about": { "content": [...], "root": {...} },
+  "products": { "content": [...], "root": {...} },
+  "contact": { "content": [...], "root": {...} }
+}`;
 }
 
 export async function generatePageManifest(intake: MarketplaceIntakeData) {
@@ -64,7 +93,9 @@ export async function generatePageManifest(intake: MarketplaceIntakeData) {
     const result = await ai.models.generateContent({
       model: 'gemini-1.5-pro',
       contents: prompt,
-      config: { responseMimeType: 'application/json' },
+      config: { 
+        responseMimeType: 'application/json' 
+      },
     });
 
     return JSON.parse(result.text || '{}');
