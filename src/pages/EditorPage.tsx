@@ -6,6 +6,7 @@ import { EdgeRootProps, TemplateFamily } from '../lib/types';
 import { validateEditorContent } from '../lib/validation';
 import { AiAssistant } from '../components/Editor/AiAssistant';
 import { WORKFLOW_STEPS } from '../lib/workflowSteps';
+import { getWorkflowBlockers, isCheckoutConfigured, WorkflowActionId, WorkflowBlocker } from '../lib/workflowActions';
 import { Layout, FileText, ShoppingBag, Mail, Home, ChevronRight, Plus, Trash2 } from 'lucide-react';
 
 interface EditorPageProps {
@@ -13,10 +14,15 @@ interface EditorPageProps {
   puckContent: { [key: string]: any };
   templateFamily: TemplateFamily;
   rootProps: EdgeRootProps;
+  inventoryCount: number;
+  publishUrl?: string;
   onPublish: (data: any) => void;
+  onOpenInventory: () => void;
+  onOpenCheckout: () => void;
+  onOpenLive: () => void;
 }
 
-export function EditorPage({ initialData, puckContent, templateFamily, rootProps, onPublish }: EditorPageProps) {
+export function EditorPage({ initialData, puckContent, templateFamily, rootProps, inventoryCount, publishUrl, onPublish, onOpenInventory, onOpenCheckout, onOpenLive }: EditorPageProps) {
   const [siteData, setSiteData] = useState(puckContent);
   const [activePage, setActivePage] = useState('home');
   const [validationResult, setValidationResult] = useState<any>(null);
@@ -112,10 +118,10 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
 
   const handlePublish = () => {
     const homePageData = siteData['home'] || Object.values(siteData)[0];
-    
+
     const updatedData = {
       ...homePageData,
-      siteData: siteData, // Store all pages in the manifest
+      siteData: siteData,
       root: {
         ...homePageData.root,
         props: {
@@ -126,19 +132,62 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
       }
     };
 
-    if (!mobileAck) {
-      alert("Please check mobile responsiveness and acknowledge before publishing.");
+    const result = validateEditorContent(updatedData, updatedData.root.props as EdgeRootProps);
+    setValidationResult(result);
+
+    if (result.passed) {
+      onPublish(updatedData);
+      return true;
+    }
+
+    const errorMsg = result.errors.map(e => e.message || "Unknown error").join('\n');
+    alert(`Validation failed. Please address the following issues:\n\n${errorMsg}`);
+    return false;
+  };
+
+  const checkoutConfigured = isCheckoutConfigured(rootProps);
+  const blockers = getWorkflowBlockers({
+    mobileAck,
+    hasInventory: inventoryCount > 0,
+    checkoutConfigured,
+    hasPublishUrl: Boolean(publishUrl),
+  });
+
+  const [activeBlockers, setActiveBlockers] = useState<WorkflowBlocker[]>([]);
+
+  const executeAction = (action: WorkflowActionId) => {
+    const actionBlockers = blockers[action] || [];
+    if (actionBlockers.length) {
+      setActiveBlockers(actionBlockers);
       return;
     }
 
-    const result = validateEditorContent(updatedData, updatedData.root.props as EdgeRootProps);
-    setValidationResult(result);
-    
-    if (result.passed) {
-      onPublish(updatedData);
-    } else {
-      const errorMsg = result.errors.map(e => e.message || "Unknown error").join('\n');
-      alert(`Validation failed. Please address the following issues:\n\n${errorMsg}`);
+    setActiveBlockers([]);
+
+    if (action === 'preview') {
+      const ok = handlePublish();
+      if (ok) alert('Preview is validated. Continue through Inventory/Checkout/Launch to publish live.');
+      return;
+    }
+
+    if (action === 'inventory') {
+      onOpenInventory();
+      return;
+    }
+
+    if (action === 'checkout') {
+      onOpenCheckout();
+      return;
+    }
+
+    if (action === 'launch') {
+      const ok = handlePublish();
+      if (ok) onOpenCheckout();
+      return;
+    }
+
+    if (action === 'live') {
+      onOpenLive();
     }
   };
 
@@ -226,7 +275,7 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
                   ))}
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 flex-wrap justify-end max-w-[520px]">
                 <label htmlFor="verified-responsive" className="text-[10px] flex items-center gap-2 cursor-pointer font-semibold uppercase tracking-[0.15em] text-[#1A1A1A] bg-black/[0.04] px-3 py-2 rounded border border-black/10 hover:bg-black/[0.07] transition-colors">
                   <input 
                     id="verified-responsive"
@@ -238,12 +287,21 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
                   />
                   Verified Responsive
                 </label>
-                
-                <button 
-                  onClick={handlePublish}
-                  className="px-4 py-2 bg-black text-white text-[10px] uppercase font-semibold tracking-[0.15em] rounded border border-black hover:bg-black/90 transition-colors"
-                >
-                  Publish Site
+
+                <button onClick={() => executeAction('preview')} className="px-3 py-2 border border-black/20 text-[10px] uppercase font-semibold tracking-[0.12em] rounded">
+                  Preview
+                </button>
+                <button onClick={() => executeAction('inventory')} className="px-3 py-2 border border-black/20 text-[10px] uppercase font-semibold tracking-[0.12em] rounded">
+                  Inventory
+                </button>
+                <button onClick={() => executeAction('checkout')} className="px-3 py-2 border border-black/20 text-[10px] uppercase font-semibold tracking-[0.12em] rounded">
+                  Checkout
+                </button>
+                <button onClick={() => executeAction('launch')} className="px-3 py-2 bg-black text-white text-[10px] uppercase font-semibold tracking-[0.12em] rounded border border-black">
+                  Launch
+                </button>
+                <button onClick={() => executeAction('live')} className="px-3 py-2 border border-black/20 text-[10px] uppercase font-semibold tracking-[0.12em] rounded">
+                  Live
                 </button>
               </div>
           </header>
@@ -251,10 +309,20 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
           <div className="px-8 py-2 border-b border-black/10 bg-white">
             <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.12em]">
               <span className="px-2 py-1 rounded border border-black/15 text-black/70">Draft: In progress</span>
-              <span className="px-2 py-1 rounded border border-amber-300 text-amber-800 bg-amber-50">Inventory: Pending</span>
-              <span className="px-2 py-1 rounded border border-black/15 text-black/60">Checkout: Not configured</span>
-              <span className="px-2 py-1 rounded border border-black/15 text-black/60">Launch: Blocked</span>
+              <span className={`px-2 py-1 rounded border ${inventoryCount > 0 ? 'border-emerald-300 text-emerald-800 bg-emerald-50' : 'border-amber-300 text-amber-800 bg-amber-50'}`}>Inventory: {inventoryCount > 0 ? `${inventoryCount} items` : 'Pending'}</span>
+              <span className={`px-2 py-1 rounded border ${checkoutConfigured ? 'border-emerald-300 text-emerald-800 bg-emerald-50' : 'border-black/15 text-black/60'}`}>Checkout: {checkoutConfigured ? 'Configured' : 'Not configured'}</span>
+              <span className={`px-2 py-1 rounded border ${blockers.launch.length === 0 ? 'border-emerald-300 text-emerald-800 bg-emerald-50' : 'border-black/15 text-black/60'}`}>Launch: {blockers.launch.length === 0 ? 'Ready' : 'Blocked'}</span>
             </div>
+            {activeBlockers.length > 0 && (
+              <div className="mt-2 p-2 rounded border border-amber-300 bg-amber-50 text-[11px] text-amber-900">
+                <p className="font-semibold uppercase tracking-[0.12em] text-[10px] mb-1">Action blocked</p>
+                <ul className="list-disc pl-4 space-y-1">
+                  {activeBlockers.map((blocker) => (
+                    <li key={blocker.code}>{blocker.message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
           
           <div className="flex-1 overflow-hidden relative" key={activePage}>

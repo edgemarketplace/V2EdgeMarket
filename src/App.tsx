@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { LandingPage } from './pages/LandingPage';
 import { Onboarding } from './pages/Onboarding';
 import { EditorPage } from './pages/EditorPage';
+import { InventoryPage } from './pages/InventoryPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { PublishedPage } from './pages/PublishedPage';
 import { SiteRenderer } from './pages/SiteRenderer';
@@ -83,6 +84,10 @@ export default function App() {
     puckContent: { [key: string]: any };
     templateFamily: TemplateFamily;
     rootProps: EdgeRootProps;
+    siteId: string;
+    slug: string;
+    inventoryItems: any[];
+    publishUrl?: string;
   } | null>(null);
   
   const [isGenerating, setIsGenerating] = useState(false);
@@ -137,6 +142,9 @@ export default function App() {
         siteContent = baseConfig.siteData;
       }
       
+      const slug = data.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const siteId = `client-${slug.slice(0, 12)}-${data.businessType}`;
+
       setEditorState({
         initialData: siteContent['home'] || baseConfig.initialData,
         puckContent: siteContent,
@@ -145,16 +153,24 @@ export default function App() {
           ...baseConfig.rootProps,
           paymentConfigured: ['checkout', 'digital', 'catalog'].includes(baseConfig.rootProps.commerceMode) ? true : undefined
         },
+        siteId,
+        slug,
+        inventoryItems: data.inventory?.items || [],
       });
       setLocation('/editor');
     } catch (e) {
       console.error("AI Generation failed:", e);
       const mappedConfig = mapIntakeToPuckConfig(data);
+      const slug = data.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const siteId = `client-${slug.slice(0, 12)}-${data.businessType}`;
       setEditorState({
         initialData: mappedConfig.initialData,
         puckContent: mappedConfig.siteData,
         templateFamily: data.businessType,
         rootProps: mappedConfig.rootProps,
+        siteId,
+        slug,
+        inventoryItems: data.inventory?.items || [],
       });
       setLocation('/editor');
     } finally {
@@ -185,7 +201,12 @@ export default function App() {
                 puckContent={editorState.puckContent}
                 templateFamily={editorState.templateFamily} 
                 rootProps={editorState.rootProps} 
+                inventoryCount={editorState.inventoryItems.length}
+                publishUrl={editorState.publishUrl}
                 onPublish={() => setLocation('/checkout')}
+                onOpenInventory={() => setLocation('/inventory')}
+                onOpenCheckout={() => setLocation('/checkout')}
+                onOpenLive={() => setLocation('/published')}
               />
             ) : (
               <div className="p-20 text-center">
@@ -194,12 +215,44 @@ export default function App() {
             )}
           </Route>
           
+          <Route path="/inventory">
+            {intakeData && editorState ? (
+              <InventoryPage
+                draft={{
+                  siteId: editorState.siteId,
+                  slug: editorState.slug,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  status: 'inventory',
+                  selectedPlan: 'launch',
+                  intakeData,
+                  templateFamily: editorState.templateFamily,
+                  rootProps: editorState.rootProps,
+                  editorData: { content: [] },
+                  inventoryItems: editorState.inventoryItems,
+                } as any}
+                onBack={() => setLocation('/editor')}
+                onContinue={(items) => {
+                  setEditorState((prev) => (prev ? { ...prev, inventoryItems: items } : prev));
+                  setLocation('/checkout');
+                }}
+                onSaveDraft={(items) => {
+                  setEditorState((prev) => (prev ? { ...prev, inventoryItems: items } : prev));
+                }}
+              />
+            ) : (
+              <div className="p-20 text-center">
+                <p>No inventory data found. Please complete <a href="/onboarding" className="underline">onboarding</a>.</p>
+              </div>
+            )}
+          </Route>
+
           <Route path="/checkout">
             {intakeData && editorState ? (
               <CheckoutPage 
                 draft={{
-                  siteId: `client-${intakeData.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 12)}-${editorState.templateFamily}`,
-                  slug: intakeData.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                  siteId: editorState.siteId,
+                  slug: editorState.slug,
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                   status: 'launch_ready',
@@ -208,10 +261,11 @@ export default function App() {
                   templateFamily: editorState.templateFamily,
                   rootProps: editorState.rootProps,
                   editorData: { content: [] },
-                  inventoryItems: [],
+                  inventoryItems: editorState.inventoryItems,
                 } as any}
                 onBack={() => setLocation('/editor')}
-                onComplete={(_plan, _deployment) => {
+                onComplete={(_plan, deployment) => {
+                  setEditorState((prev) => (prev ? { ...prev, publishUrl: deployment.publishUrl } : prev));
                   setLocation('/published');
                 }}
               />
@@ -226,8 +280,8 @@ export default function App() {
             {intakeData && editorState ? (
               <PublishedPage 
                 draft={{
-                  siteId: `client-${intakeData.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 12)}-${editorState.templateFamily}`,
-                  slug: intakeData.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                  siteId: editorState.siteId,
+                  slug: editorState.slug,
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                   status: 'launch_ready',
@@ -236,7 +290,7 @@ export default function App() {
                   templateFamily: editorState.templateFamily,
                   rootProps: editorState.rootProps,
                   editorData: { content: [] },
-                  inventoryItems: [],
+                  inventoryItems: editorState.inventoryItems,
                 } as any}
                 onBack={() => setLocation('/checkout')}
                 onDeploymentUpdate={() => {}}
