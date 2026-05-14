@@ -24,6 +24,26 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
   
   const config = createPuckConfig(templateFamily);
 
+  useEffect(() => {
+    const patchAnonymousFormFields = () => {
+      const container = document.querySelector('.Puck');
+      if (!container) return;
+
+      const fields = container.querySelectorAll('input, select, textarea');
+      fields.forEach((field, index) => {
+        const input = field as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+        if (!input.id) input.id = `puck-field-${index}`;
+        if (!input.getAttribute('name')) input.setAttribute('name', input.id);
+      });
+    };
+
+    patchAnonymousFormFields();
+    const observer = new MutationObserver(() => patchAnonymousFormFields());
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, [activePage]);
+
   const [pageList, setPageList] = useState(
     Object.keys(puckContent).length > 0 
       ? Object.keys(puckContent).map(key => ({
