@@ -12,6 +12,14 @@ import {
   SiteLifecycleStatus,
 } from '../lib/types';
 import { syncInventoryToMedusa } from './medusa';
+import { classifyFailure, FailureCode } from '../lib/failure-classification';
+import {
+  logger,
+  getCorrelationContext,
+  generateCorrelationId,
+  withCorrelationContext,
+  CorrelationContext,
+} from './structured-logger';
 
 const memoryInventory = new Map<string, InventoryItem[]>();
 const memoryDeployments = new Map<string, DeploymentRecord>();
@@ -92,7 +100,16 @@ function historyEntry(
   source: DeploymentHistoryEntry['source'],
   at = new Date().toISOString(),
 ): DeploymentHistoryEntry {
-  return { status, message, source, at };
+  const ctx = getCorrelationContext();
+  return {
+    status,
+    message,
+    source,
+    at,
+    correlationId: ctx.correlationId,
+    reconcileRunId: ctx.reconcileRunId,
+    leaseHolder: ctx.leaseHolder,
+  };
 }
 
 function normalizeDraftForStorage(draft: MarketplaceSiteDraft) {
@@ -116,6 +133,7 @@ function normalizeDeploymentRecord(record: Partial<DeploymentRecord> & Pick<Depl
   const requestedAt = record.requestedAt || new Date().toISOString();
   const updatedAt = record.updatedAt || requestedAt;
   const deploymentId = record.deploymentId || crypto.randomUUID();
+  const ctx = getCorrelationContext();
   return {
     deploymentId,
     siteId: record.siteId,
@@ -134,6 +152,9 @@ function normalizeDeploymentRecord(record: Partial<DeploymentRecord> & Pick<Depl
     provisioningId: record.provisioningId,
     vercelDeploymentId: record.vercelDeploymentId,
     history: normalizeHistory(record.history, { ...record, requestedAt }),
+    correlationId: record.correlationId || ctx.correlationId,
+    leaseHolder: record.leaseHolder || ctx.leaseHolder,
+    reconcileRunId: record.reconcileRunId || ctx.reconcileRunId,
   };
 }
 
@@ -163,10 +184,14 @@ function cloneDeploymentWithTransition(
     failureReason?: string;
     provisioningId?: string;
     vercelDeploymentId?: string;
+    correlationId?: string;
+    reconcileRunId?: string;
+    leaseHolder?: string;
     now?: () => string;
   },
 ) {
   const at = nowIso(options?.now);
+  const ctx = getCorrelationContext();
   return normalizeDeploymentRecord({
     ...deployment,
     status: nextStatus,
@@ -179,6 +204,9 @@ function cloneDeploymentWithTransition(
     failureReason: options?.failureReason,
     provisioningId: options?.provisioningId ?? deployment.provisioningId,
     vercelDeploymentId: options?.vercelDeploymentId ?? deployment.vercelDeploymentId,
+    correlationId: options?.correlationId || ctx.correlationId,
+    reconcileRunId: options?.reconcileRunId || ctx.reconcileRunId,
+    leaseHolder: options?.leaseHolder || ctx.leaseHolder,
     history: [...deployment.history, historyEntry(nextStatus, message, source, at)],
   });
 }
@@ -413,10 +441,18 @@ export async function saveDeployment(record: DeploymentRecord) {
       provisioning_id: normalized.provisioningId || null,
       vercel_deployment_id: normalized.vercelDeploymentId || null,
       history: normalized.history,
+      correlation_id: normalized.correlationId || null,
+      lease_holder: normalized.leaseHolder || null,
+      reconcile_run_id: normalized.reconcileRunId || null,
     }, { onConflict: 'site_id' });
 
     if (error) {
-      console.warn('Supabase deployment save failed:', error.message);
+      logger.warn({
+        event: 'deployment_transition',
+        siteId: normalized.siteId,
+        deploymentId: normalized.deploymentId,
+        reason: `Supabase deployment save failed: ${error.message}`,
+      });
     }
 
     const { error: marketplaceError } = await supabase
@@ -425,9 +461,29 @@ export async function saveDeployment(record: DeploymentRecord) {
       .eq('id', normalized.siteId);
 
     if (marketplaceError) {
-      console.warn('Supabase marketplace deployment update failed:', marketplaceError.message);
+      logger.warn({
+        event: 'deployment_transition',
+        siteId: normalized.siteId,
+        deploymentId: normalized.deploymentId,
+        reason: `Supabase marketplace deployment update failed: ${marketplaceError.message}`,
+      });
     }
   }
+
+  // Structured log for every deployment state change
+  const failed = normalized.status === 'failed';
+  const classified = failed ? classifyFailure(normalized.failureReason || normalized.message || '') : undefined;
+
+  logger.log({
+    event: failed ? 'deployment_failed' : 'deployment_transition',
+    siteId: normalized.siteId,
+    deploymentId: normalized.deploymentId,
+    status: normalized.status,
+    previousStatus: record.history?.length ? record.history[record.history.length - 2]?.status : undefined,
+    message: normalized.message || undefined,
+    failureCode: classified?.code,
+    failureCategory: classified?.category,
+  });
 
   return normalized;
 }
@@ -513,6 +569,13 @@ export async function getDeploymentByDeploymentId(deploymentId: string) {
 export async function requestDeployment(siteId: string, plan: LaunchPlan, idempotencyKey: string, now?: () => string) {
   const existing = await getDeployment(siteId);
   if (existing?.idempotencyKey === idempotencyKey) {
+    logger.log({
+      event: 'deployment_requested',
+      siteId,
+      deploymentId: existing.deploymentId,
+      status: existing.status,
+      message: 'Idempotent request — returning existing deployment.',
+    });
     return existing;
   }
 
@@ -521,11 +584,32 @@ export async function requestDeployment(siteId: string, plan: LaunchPlan, idempo
     const lastUpdate = new Date(existing.updatedAt).getTime();
     const cooldownMs = 5 * 60 * 1000; // 5 minutes
     if (Date.now() - lastUpdate < cooldownMs) {
+      logger.log({
+        event: 'deployment_requested',
+        siteId,
+        deploymentId: existing.deploymentId,
+        status: existing.status,
+        message: 'Retry blocked — still in cooldown.',
+      });
       return existing; // still in cooldown
     }
+    logger.log({
+      event: 'deployment_retry',
+      siteId,
+      deploymentId: existing.deploymentId,
+      status: 'deploy_requested',
+      message: 'Cooldown expired — retrying deployment.',
+    });
   }
 
   if (existing && isActiveDeploymentStatus(existing.status)) {
+    logger.log({
+      event: 'deployment_requested',
+      siteId,
+      deploymentId: existing.deploymentId,
+      status: existing.status,
+      message: 'Deployment already in progress.',
+    });
     return existing;
   }
 
@@ -534,7 +618,7 @@ export async function requestDeployment(siteId: string, plan: LaunchPlan, idempo
   const attemptCount = existing ? existing.attemptCount + 1 : 1;
 
   if (!inventory.length) {
-    return saveDeployment(normalizeDeploymentRecord({
+    const blocked = normalizeDeploymentRecord({
       deploymentId: crypto.randomUUID(),
       siteId,
       status: 'launch_ready',
@@ -545,10 +629,18 @@ export async function requestDeployment(siteId: string, plan: LaunchPlan, idempo
       updatedAt: requestedAt,
       message: 'Launch request was blocked because inventory is empty. Add inventory before provisioning can begin.',
       history: [historyEntry('launch_ready', 'Launch request blocked because inventory is empty.', 'request', requestedAt)],
-    }));
+    });
+    logger.log({
+      event: 'deployment_requested',
+      siteId,
+      deploymentId: blocked.deploymentId,
+      status: 'launch_ready',
+      message: 'Blocked — no inventory.',
+    });
+    return saveDeployment(blocked);
   }
 
-  return saveDeployment(normalizeDeploymentRecord({
+  const requested = normalizeDeploymentRecord({
     deploymentId: crypto.randomUUID(),
     siteId,
     status: 'deploy_requested',
@@ -559,13 +651,33 @@ export async function requestDeployment(siteId: string, plan: LaunchPlan, idempo
     updatedAt: requestedAt,
     message: 'Launch request recorded. Reconciliation will advance the deployment through provisioning states.',
     history: [historyEntry('deploy_requested', 'Launch request recorded.', 'request', requestedAt)],
-  }));
+  });
+
+    logger.log({
+      event: 'deployment_requested',
+      siteId,
+      deploymentId: requested.deploymentId,
+      status: 'deploy_requested',
+      message: 'Launch request recorded.',
+      metadata: { attemptCount },
+    });
+
+  return saveDeployment(requested);
 }
 
 export async function reconcileDeployment(siteId: string, options: ReconcileOptions = {}) {
+  const reconcileStartTime = Date.now();
   let deployment = await getDeployment(siteId);
   if (!deployment) return null;
   if (isTerminalDeploymentStatus(deployment.status) || deployment.status === 'launch_ready') return deployment;
+
+  logger.log({
+    event: 'deployment_reconciled',
+    siteId,
+    deploymentId: deployment.deploymentId,
+    status: deployment.status,
+    message: 'Reconciliation started.',
+  });
 
   const capabilities = options.capabilities || await getCapabilities();
   const inventory = await getInventory(siteId);
@@ -582,6 +694,17 @@ export async function reconcileDeployment(siteId: string, options: ReconcileOpti
         now: options.now,
       },
     );
+    const classification = classifyFailure('inventory_missing');
+    logger.error({
+      event: 'deployment_failed',
+      siteId,
+      deploymentId: deployment.deploymentId,
+      status: 'failed',
+      failureCode: classification.code,
+      failureCategory: classification.category,
+      message: 'Inventory missing during reconciliation.',
+      durationMs: Date.now() - reconcileStartTime,
+    });
     return saveDeployment(failed);
   }
 
@@ -606,6 +729,17 @@ export async function reconcileDeployment(siteId: string, options: ReconcileOpti
               now: options.now,
             },
           ));
+          logger.error({
+            event: 'deployment_timeout',
+            siteId,
+            deploymentId: deployment.deploymentId,
+            status: 'failed',
+            failureCode: 'TIMEOUT',
+            failureCategory: 'TRANSIENT',
+            durationMs: Date.now() - reconcileStartTime,
+            message: `Timed out after ${Math.round(stalledMinutes)}m in ${deployment.status}.`,
+            metadata: { stalledMinutes: Math.round(stalledMinutes) },
+          });
           return deployment;
         }
       }
@@ -619,6 +753,15 @@ export async function reconcileDeployment(siteId: string, options: ReconcileOpti
           { now: options.now },
         ));
       }
+
+      logger.log({
+        event: 'deployment_reconciled',
+        siteId,
+        deploymentId: deployment.deploymentId,
+        status: deployment.status,
+        durationMs: Date.now() - reconcileStartTime,
+        message: 'Reconciliation paused — waiting for external event.',
+      });
       return deployment;
     }
 
@@ -679,8 +822,27 @@ export async function reconcileDeployment(siteId: string, options: ReconcileOpti
             now: options.now,
           },
         ));
+        const classification = classifyFailure(medusaSync.message);
+        logger.error({
+          event: 'deployment_failed',
+          siteId,
+          deploymentId: deployment.deploymentId,
+          status: 'failed',
+          failureCode: classification.code,
+          failureCategory: classification.category,
+          durationMs: Date.now() - reconcileStartTime,
+          message: `Medusa sync failed: ${medusaSync.message}`,
+        });
         return deployment;
       }
+
+      logger.log({
+        event: 'inventory_synced',
+        siteId,
+        deploymentId: deployment.deploymentId,
+        message: `Synced ${medusaSync.productCount || 0} products to Medusa.`,
+        metadata: { productCount: medusaSync.productCount },
+      });
 
       deployment = await saveDeployment(cloneDeploymentWithTransition(
         deployment,
@@ -695,6 +857,15 @@ export async function reconcileDeployment(siteId: string, options: ReconcileOpti
     return deployment;
   }
 
+  logger.log({
+    event: 'deployment_reconciled',
+    siteId,
+    deploymentId: deployment.deploymentId,
+    status: deployment.status,
+    durationMs: Date.now() - reconcileStartTime,
+    message: 'Reconciliation complete.',
+  });
+
   return deployment;
 }
 
@@ -708,12 +879,24 @@ export async function applyDeploymentEventByDeploymentId(deploymentId: string, e
     entry.source === 'webhook'
   ) && deployment.failureReason === event.failureReason;
   if (alreadyApplied) {
-    console.log(`Idempotent webhook: deployment ${deploymentId} already in ${event.status}`);
+    logger.log({
+      event: 'webhook_received',
+      siteId: deployment.siteId,
+      deploymentId,
+      status: deployment.status,
+      message: `Idempotent webhook — already in ${event.status}.`,
+    });
     return deployment;
   }
 
   if (!transitionAllowed(deployment.status, event.status)) {
-    console.log(`Invalid transition: ${deployment.status} → ${event.status} for deployment ${deploymentId}`);
+    logger.warn({
+      event: 'webhook_received',
+      siteId: deployment.siteId,
+      deploymentId,
+      status: event.status,
+      reason: `Invalid transition: ${deployment.status} → ${event.status}`,
+    });
     return deployment;
   }
 
@@ -733,7 +916,294 @@ export async function applyDeploymentEventByDeploymentId(deploymentId: string, e
     },
   );
 
+  logger.log({
+    event: 'webhook_received',
+    siteId: deployment.siteId,
+    deploymentId,
+    status: event.status,
+    previousStatus: deployment.status,
+    message: `Webhook transition: ${deployment.status} → ${event.status}`,
+  });
+
   return saveDeployment(next);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Phase 4: SiteStore — DeploymentRepository-compatible methods
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Acquire a lease on a deployment for the given holder.
+ * Returns true if the lease was acquired, false if already held.
+ * Leases auto-expire after ttlSec seconds (covers crashed workers).
+ */
+export async function acquireLease(
+  deploymentId: string,
+  leaseHolder: string,
+  ttlSec: number = 120,
+): Promise<boolean> {
+  const deployment = await getDeploymentByDeploymentId(deploymentId);
+  if (!deployment) return false;
+
+  // Check if lease is currently held by someone else and not expired
+  if (deployment.leaseHolder && deployment.leaseHolder !== leaseHolder) {
+    const leasedAt = new Date(deployment.updatedAt).getTime();
+    const leaseAge = (Date.now() - leasedAt) / 1000;
+    if (leaseAge < ttlSec) {
+      // Lease still valid — held by another worker
+      return false;
+    }
+    // Lease expired — can be acquired
+  }
+
+  // Acquire the lease
+  const updated = await saveDeployment(normalizeDeploymentRecord({
+    ...deployment,
+    leaseHolder,
+    reconcileRunId: getCorrelationContext().reconcileRunId,
+    updatedAt: new Date().toISOString(),
+  }));
+
+  logger.log({
+    event: 'deployment_lease_acquired',
+    siteId: deployment.siteId,
+    deploymentId,
+    leaseHolder,
+    message: 'Lease acquired.',
+  });
+
+  return true;
+}
+
+/**
+ * Release a lease held by the given holder.
+ * Only releases if the holder matches (safety check).
+ */
+export async function releaseLease(
+  deploymentId: string,
+  leaseHolder: string,
+): Promise<boolean> {
+  const deployment = await getDeploymentByDeploymentId(deploymentId);
+  if (!deployment) return false;
+  if (deployment.leaseHolder !== leaseHolder) return false;
+
+  await saveDeployment(normalizeDeploymentRecord({
+    ...deployment,
+    leaseHolder: undefined,
+    reconcileRunId: undefined,
+    updatedAt: new Date().toISOString(),
+  }));
+
+  logger.log({
+    event: 'deployment_lease_released',
+    siteId: deployment.siteId,
+    deploymentId,
+    leaseHolder,
+    message: 'Lease released.',
+  });
+
+  return true;
+}
+
+/**
+ * Find deployments that are stalled and need reconciliation.
+ * Returns candidates with non-terminal status that haven't been
+ * updated in at least `stalledMinutes` minutes.
+ */
+export async function findReconcilableDeployments(
+  stalledMinutes: number = 2,
+): Promise<DeploymentRecord[]> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    // Fall back to in-memory search
+    return Array.from(memoryDeployments.values()).filter((d) => {
+      if (isTerminalDeploymentStatus(d.status)) return false;
+      const stalledMs = Date.now() - new Date(d.updatedAt).getTime();
+      return stalledMs >= stalledMinutes * 60 * 1000;
+    });
+  }
+
+  const cutoff = new Date(Date.now() - stalledMinutes * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('deployments')
+    .select('site_id,deployment_id,status,plan,idempotency_key,attempt_count,requested_at,updated_at,deployed_at,publish_url,message,medusa_sync,failure_stage,failure_reason,provisioning_id,vercel_deployment_id,history,correlation_id,lease_holder,reconcile_run_id')
+    .not('status', 'in', JSON.stringify(TERMINAL_DEPLOYMENT_STATUSES))
+    .lt('updated_at', cutoff)
+    .order('updated_at', { ascending: true })
+    .limit(25);
+
+  if (error || !data?.length) return [];
+
+  return data.map((row) => normalizeDeploymentRecord({
+    siteId: row.site_id,
+    deploymentId: row.deployment_id,
+    status: row.status,
+    plan: row.plan,
+    idempotencyKey: row.idempotency_key,
+    attemptCount: row.attempt_count,
+    requestedAt: row.requested_at,
+    updatedAt: row.updated_at,
+    deployedAt: row.deployed_at || undefined,
+    publishUrl: row.publish_url || undefined,
+    message: row.message || undefined,
+    medusaSync: row.medusa_sync || undefined,
+    failureStage: row.failure_stage || undefined,
+    failureReason: row.failure_reason || undefined,
+    provisioningId: row.provisioning_id || undefined,
+    vercelDeploymentId: row.vercel_deployment_id || undefined,
+    correlationId: row.correlation_id || undefined,
+    leaseHolder: row.lease_holder || undefined,
+    reconcileRunId: row.reconcile_run_id || undefined,
+    history: (row.history as DeploymentHistoryEntry[] | null) || undefined,
+  }));
+}
+
+/**
+ * Get deployment counts grouped by status.
+ */
+export async function getDeploymentStatusCounts(): Promise<
+  { status: SiteLifecycleStatus; count: number }[]
+> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    const counts: Record<string, number> = {};
+    for (const d of memoryDeployments.values()) {
+      counts[d.status] = (counts[d.status] || 0) + 1;
+    }
+    return Object.entries(counts).map(([status, count]) => ({
+      status: status as SiteLifecycleStatus,
+      count,
+    }));
+  }
+
+  const { data, error } = await supabase
+    .from('deployments')
+    .select('status');
+  if (error || !data) return [];
+
+  const counts: Record<string, number> = {};
+  for (const row of data) {
+    counts[row.status] = (counts[row.status] || 0) + 1;
+  }
+  return Object.entries(counts).map(([status, count]) => ({
+    status: status as SiteLifecycleStatus,
+    count,
+  }));
+}
+
+/**
+ * Mark a deployment as failed with a given reason and classified failure.
+ */
+export async function markFailed(
+  siteId: string,
+  reason: string,
+  failureStage?: SiteLifecycleStatus,
+): Promise<{ success: boolean; status?: SiteLifecycleStatus }> {
+  const deployment = await getDeployment(siteId);
+  if (!deployment) return { success: false };
+  if (isTerminalDeploymentStatus(deployment.status)) {
+    return { success: false, status: deployment.status };
+  }
+
+  const failed = cloneDeploymentWithTransition(
+    deployment,
+    'failed',
+    reason,
+    'system',
+    {
+      failureStage: failureStage || deployment.status,
+      failureReason: reason,
+    },
+  );
+
+  const result = await saveDeployment(failed);
+  return { success: true, status: result.status };
+}
+
+/**
+ * Retry a failed deployment.
+ * Enforces a 5-minute cooldown from the last failure.
+ */
+export async function retryDeployment(
+  siteId: string,
+): Promise<{ success: boolean; status?: SiteLifecycleStatus; message: string }> {
+  const deployment = await getDeployment(siteId);
+  if (!deployment) {
+    return { success: false, message: 'No deployment found.' };
+  }
+
+  if (deployment.status !== 'failed') {
+    return {
+      success: false,
+      status: deployment.status,
+      message: `Cannot retry — deployment is in ${deployment.status} state.`,
+    };
+  }
+
+  // 5-minute cooldown
+  const lastUpdate = new Date(deployment.updatedAt).getTime();
+  const cooldownMs = 5 * 60 * 1000;
+  if (Date.now() - lastUpdate < cooldownMs) {
+    const remainingSec = Math.ceil((cooldownMs - (Date.now() - lastUpdate)) / 1000);
+    return {
+      success: false,
+      status: 'failed',
+      message: `Retry blocked — cooldown active. Try again in ${remainingSec}s.`,
+    };
+  }
+
+  // Reset to deploy_requested for re-reconciliation
+  const retried = cloneDeploymentWithTransition(
+    deployment,
+    'deploy_requested',
+    'Retry requested by operator after previous failure.',
+    'system',
+  );
+
+  const result = await saveDeployment(retried);
+  return {
+    success: true,
+    status: result.status,
+    message: 'Deployment retry initiated. Reconciliation will advance it.',
+  };
+}
+
+/**
+ * Reconcile a deployment with lease protection.
+ * Safe for multiple concurrent workers — only one acquires the lease.
+ */
+export async function reconcileWithLease(
+  siteId: string,
+  leaseHolder: string,
+): Promise<{
+  handled: boolean;
+  status?: SiteLifecycleStatus;
+  eventCount: number;
+}> {
+  const deployment = await getDeployment(siteId);
+  if (!deployment) return { handled: false, eventCount: 0 };
+
+  // Try to acquire lease
+  const acquired = await acquireLease(deployment.deploymentId, leaseHolder);
+  if (!acquired) {
+    return {
+      handled: false,
+      status: deployment.status,
+      eventCount: 0,
+    };
+  }
+
+  try {
+    const result = await reconcileDeployment(siteId);
+    const historyLength = result?.history?.length || 0;
+    return {
+      handled: true,
+      status: result?.status,
+      eventCount: historyLength,
+    };
+  } finally {
+    await releaseLease(deployment.deploymentId, leaseHolder);
+  }
 }
 
 export function buildDeploymentRecord(
