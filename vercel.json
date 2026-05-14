@@ -1,12 +1,22 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/reconcile",
+      "schedule": "*/2 * * * *"
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
   "functions": {
-    "api/*.ts": {
+    "api/**/*.ts": {
       "maxDuration": 60
     }
   }
