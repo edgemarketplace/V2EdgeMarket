@@ -36,25 +36,37 @@ export function CheckoutPage({
       : existingDeployment.idempotencyKey;
 
     try {
-      await fetch(`/api/sites/${draft.siteId}/checkout-intents`, {
+      // Ensure server-side site exists before deploying
+      const siteRes = await fetch('/api/sites', {
         method: 'POST',
-        headers: buildSiteHeaders(draft),
-        body: JSON.stringify({
-          customerName: ownerName,
-          email,
-          notes,
-          productInterest: draft.intakeData.offerings,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft.intakeData),
       });
+      const serverSite = await siteRes.json();
+      const siteId = serverSite.siteId || draft.siteId;
+      const siteToken = serverSite.siteToken || draft.siteToken;
 
-      const response = await fetch(`/api/sites/${draft.siteId}/deploy`, {
+      if (siteToken) {
+        await fetch(`/api/sites/${siteId}/checkout-intents`, {
+          method: 'POST',
+          headers: buildSiteHeaders({ ...draft, siteId, siteToken }),
+          body: JSON.stringify({
+            customerName: ownerName,
+            email,
+            notes,
+            productInterest: draft.intakeData.offerings,
+          }),
+        });
+      }
+
+      const response = await fetch(`/api/sites/${siteId}/deploy`, {
         method: 'POST',
         headers: {
-          ...buildSiteHeaders(draft),
+          ...buildSiteHeaders({ ...draft, siteId, siteToken }),
           'x-idempotency-key': idempotencyKey,
         },
         body: JSON.stringify({
-          siteId: draft.siteId,
+          siteId,
           selectedPlan,
           ownerName,
           email,
@@ -64,7 +76,8 @@ export function CheckoutPage({
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const text = await response.text();
+        throw new Error(text || `Server returned ${response.status}`);
       }
 
       const deployment = await response.json();
@@ -115,28 +128,43 @@ export function CheckoutPage({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <input
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-              className="border border-black/10 rounded-2xl px-4 py-4"
-              placeholder="Owner or operator name"
-            />
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="border border-black/10 rounded-2xl px-4 py-4"
-              placeholder="Launch contact email"
-              type="email"
-            />
+            <div>
+              <label htmlFor="owner-name" className="text-xs font-bold uppercase tracking-wider text-black/50 mb-1 block">Owner Name</label>
+              <input
+                id="owner-name"
+                name="ownerName"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                className="w-full border border-black/10 rounded-2xl px-4 py-4"
+                placeholder="Owner or operator name"
+              />
+            </div>
+            <div>
+              <label htmlFor="launch-email" className="text-xs font-bold uppercase tracking-wider text-black/50 mb-1 block">Contact Email</label>
+              <input
+                id="launch-email"
+                name="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full border border-black/10 rounded-2xl px-4 py-4"
+                placeholder="Launch contact email"
+                type="email"
+              />
+            </div>
           </div>
 
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={5}
-            className="w-full border border-black/10 rounded-[28px] px-4 py-4 mb-8"
-            placeholder="Optional launch notes, domain requirements, catalog caveats, or launch timing."
-          />
+          <div>
+            <label htmlFor="launch-notes" className="text-xs font-bold uppercase tracking-wider text-black/50 mb-1 block">Launch Notes (optional)</label>
+            <textarea
+              id="launch-notes"
+              name="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={5}
+              className="w-full border border-black/10 rounded-[28px] px-4 py-4 mb-8"
+              placeholder="Optional launch notes, domain requirements, catalog caveats, or launch timing."
+            />
+          </div>
 
           {error && <p className="text-red-600 text-sm mb-6">{error}</p>}
 
@@ -145,7 +173,7 @@ export function CheckoutPage({
               <ArrowLeft className="w-4 h-4" />
               Back to inventory
             </button>
-            <button onClick={launch} disabled={submitting || !draft.inventoryItems.length} className="px-6 py-4 rounded-full bg-black text-white font-bold inline-flex items-center gap-3 disabled:opacity-40">
+            <button onClick={launch} disabled={submitting} className="px-6 py-4 rounded-full bg-black text-white font-bold inline-flex items-center gap-3 disabled:opacity-40">
               {submitting ? 'Submitting launch…' : 'Request launch'}
               <ArrowRight className="w-4 h-4" />
             </button>

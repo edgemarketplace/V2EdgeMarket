@@ -280,17 +280,36 @@ function createSection(sectionId: string, commonId: string, intake: MarketplaceI
           description: 'Get new inventory, launch windows, and featured releases in your inbox.',
         },
       };
-    case 'ConversionQuoteCTA':
+    case 'ConversionQuoteCTA': {
+      const ctaByMode: Record<string, { title: string; ctaText: string; description: string }> = {
+        quote: {
+          title: 'Request a custom quote',
+          ctaText: 'Request Quote',
+          description: `Tell us about your project and we'll prepare a tailored proposal for ${intake.businessName}.`,
+        },
+        booking: {
+          title: 'Book your appointment',
+          ctaText: 'Book Now',
+          description: `Schedule time with ${intake.businessName}. Select a date and we'll confirm your booking.`,
+        },
+        checkout: {
+          title: 'Ready for the next step?',
+          ctaText: 'Proceed to Checkout',
+          description: `Review your selections and complete your purchase with ${intake.businessName}.`,
+        },
+      };
+      const mode = ctaByMode[intake.primaryGoal] || ctaByMode.quote;
       return {
         id: commonId,
         type: sectionId,
         props: {
           id: commonId,
-          title: intake.primaryGoal === 'quote' ? 'Tell us what you need' : 'Ready for the next step?',
-          description: `We'll help you move from interest to action with a clearer path tailored to ${intake.businessName}.`,
-          ctaText,
+          title: mode.title,
+          description: mode.description,
+          ctaText: mode.ctaText,
         },
       };
+    }
     case 'ConversionStickyPromo':
       return {
         id: commonId,
@@ -319,13 +338,56 @@ function createSection(sectionId: string, commonId: string, intake: MarketplaceI
   }
 }
 
-const PAGE_PRESETS: Record<string, string[]> = {
-  home: ["HeaderSimple", "HeroFullVisual", "GridFeaturedProducts", "StorySplit", "TrustReviews", "FooterCommerce"],
-  about: ["HeaderSimple", "StoryFounder", "StoryEditorialBand", "StoryValueIcons", "FooterCommerce"],
-  products: ["HeaderSimple", "GridCollections", "GridFeaturedProducts", "ConversionFAQ", "FooterCommerce"],
-  "product-detail": ["HeaderSimple", "GridProductDetail", "GridFeaturedProducts", "ConversionNewsletter", "FooterCommerce"],
-  contact: ["HeaderSimple", "HeroServiceFirst", "ConversionQuoteCTA", "FooterService"]
-};
+function getPagePresets(commerceMode: CommerceMode): Record<string, string[]> {
+  const base = {
+    about: ["HeaderSimple", "StoryFounder", "StoryEditorialBand", "StoryValueIcons", "FooterCommerce"],
+  };
+
+  switch (commerceMode) {
+    case 'checkout':
+      return {
+        ...base,
+        home: ["HeaderSimple", "HeroProductFirst", "GridFeaturedProducts", "StorySplit", "TrustReviews", "FooterCommerce"],
+        products: ["HeaderSimple", "GridFeaturedProducts", "GridCollections", "ConversionFAQ", "FooterCommerce"],
+        contact: ["HeaderSimple", "HeroServiceFirst", "ConversionQuoteCTA", "FooterService"],
+      };
+    case 'quote':
+      return {
+        ...base,
+        home: ["HeaderSimple", "HeroFullVisual", "GridServiceCards", "TrustTestimonials", "ConversionQuoteCTA", "FooterService"],
+        "request-quote": ["HeaderSimple", "HeroServiceFirst", "ConversionQuoteCTA", "FooterService"],
+        contact: ["HeaderSimple", "ConversionQuoteCTA", "FooterService"],
+      };
+    case 'booking':
+      return {
+        ...base,
+        home: ["HeaderSimple", "HeroFullVisual", "GridServiceCards", "TrustReviews", "ConversionQuoteCTA", "FooterService"],
+        "book-now": ["HeaderSimple", "HeroServiceFirst", "ConversionQuoteCTA", "FooterService"],
+        contact: ["HeaderSimple", "ConversionQuoteCTA", "FooterService"],
+      };
+    case 'catalog':
+      return {
+        ...base,
+        home: ["HeaderSimple", "HeroImageLeft", "GridCollections", "TrustReviews", "FooterCommerce"],
+        products: ["HeaderSimple", "GridFeaturedProducts", "GridCollections", "ConversionFAQ", "FooterCommerce"],
+        contact: ["HeaderSimple", "HeroServiceFirst", "ConversionQuoteCTA", "FooterService"],
+      };
+    case 'digital':
+      return {
+        ...base,
+        home: ["HeaderSimple", "HeroProductFirst", "GridFeaturedProducts", "StorySplit", "ConversionNewsletter", "FooterCommerce"],
+        products: ["HeaderSimple", "GridFeaturedProducts", "ConversionFAQ", "FooterCommerce"],
+        contact: ["HeaderSimple", "ConversionQuoteCTA", "FooterService"],
+      };
+    default:
+      return {
+        ...base,
+        home: ["HeaderSimple", "HeroFullVisual", "GridFeaturedProducts", "StorySplit", "TrustReviews", "FooterCommerce"],
+        products: ["HeaderSimple", "GridFeaturedProducts", "ConversionFAQ", "FooterCommerce"],
+        contact: ["HeaderSimple", "HeroServiceFirst", "ConversionQuoteCTA", "FooterService"],
+      };
+  }
+}
 
 export function mapIntakeToPuckConfig(intake: MarketplaceIntakeData) {
   const templateConfig = TEMPLATE_MANIFESTS[intake.businessType];
@@ -364,21 +426,43 @@ export function mapIntakeToPuckConfig(intake: MarketplaceIntakeData) {
     );
   };
 
+  const buildNavLinks = (pageKey: string) => {
+    const links = [{ label: 'Home', href: '/home' }];
+    
+    switch (intake.primaryGoal) {
+      case 'quote':
+        links.push({ label: 'Request Quote', href: '/request-quote' });
+        links.push({ label: 'About', href: '/about' });
+        links.push({ label: 'Contact', href: '/contact' });
+        break;
+      case 'booking':
+        links.push({ label: 'Book Now', href: '/book-now' });
+        links.push({ label: 'About', href: '/about' });
+        links.push({ label: 'Contact', href: '/contact' });
+        break;
+      case 'checkout':
+      case 'catalog':
+      case 'digital':
+      default:
+        links.push({ label: 'Shop', href: '/products' });
+        links.push({ label: 'About', href: '/about' });
+        links.push({ label: 'Contact', href: '/contact' });
+        break;
+    }
+    return links;
+  };
+
   const siteData: Record<string, any> = {};
+  const presets = getPagePresets(intake.primaryGoal);
   
   // Generate content for each preset page
-  Object.entries(PAGE_PRESETS).forEach(([pageKey, stack]) => {
+  Object.entries(presets).forEach(([pageKey, stack]) => {
     const pageContent = generatePageContent(stack);
     
     // Inject correct nav links for this page
     const header = pageContent.find(c => c.type.startsWith('Header'));
     if (header) {
-      header.props.navLinks = [
-        { label: 'Home', href: '/home' },
-        { label: 'About', href: '/about' },
-        { label: 'Shop', href: '/products' },
-        { label: 'Contact', href: '/contact' },
-      ];
+      header.props.navLinks = buildNavLinks(pageKey);
     }
 
     siteData[pageKey] = {

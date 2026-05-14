@@ -58,7 +58,14 @@ Influence the visual style based on:
 
 ---
 
-### **APPROVED PUCK COMPONENTS (use these exact names)**
+### **COMMERCE MODE — determines page structure**
+- **checkout**: Generate home + products + about + contact. Home should have a product-first hero. Products page should have GridFeaturedProducts with items.
+- **quote**: Generate home + request-quote + about + contact. Home should have ConversionQuoteCTA with "Request Quote". request-quote page should have a detailed service inquiry section.
+- **booking**: Generate home + book-now + about + contact. Home should have ConversionQuoteCTA with "Book Now". book-now page should have booking CTA and service description.
+- **catalog**: Generate home + products + about + contact. Catalog-first layout, no checkout flow.
+- **digital**: Generate home + products + about + contact. Digital product focus with newsletter signup.
+
+### **APPROVED PUCK COMPONENTS — use these exact type names**
 Headers: HeaderSimple, HeaderPromo, HeaderMega
 Heroes: HeroImageLeft, HeroFullVisual, HeroProductFirst, HeroServiceFirst
 Grids: GridFeaturedProducts, GridCollections, GridServiceCards, GridPackages
