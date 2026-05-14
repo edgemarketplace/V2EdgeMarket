@@ -42,7 +42,14 @@ export function CheckoutPage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft.intakeData),
       });
-      const serverSite = await siteRes.json();
+
+      if (!siteRes.ok) {
+        const text = await siteRes.text();
+        throw new Error(text || `Site creation failed with ${siteRes.status}`);
+      }
+
+      const siteResText = await siteRes.text();
+      const serverSite = siteResText ? JSON.parse(siteResText) : {};
       const siteId = serverSite.siteId || draft.siteId;
       const siteToken = serverSite.siteToken || draft.siteToken;
 
@@ -80,7 +87,8 @@ export function CheckoutPage({
         throw new Error(text || `Server returned ${response.status}`);
       }
 
-      const deployment = await response.json();
+      const deploymentText = await response.text();
+      const deployment = deploymentText ? JSON.parse(deploymentText) : {};
       onComplete(selectedPlan, deployment);
     } catch (launchError) {
       console.error(launchError);
