@@ -53,13 +53,24 @@ Create an AI-assisted, constrained marketplace/site builder JSON configuration f
 
 ${inventoryContext}
 
+### **ALLOWED COMPONENTS LIST**
+You MUST use ONLY these exact strings for the "type" property in the content array:
+- Headers: "HeaderSimple", "HeaderPromo", "HeaderMega"
+- Heroes: "HeroImageLeft", "HeroFullVisual", "HeroProductFirst", "HeroServiceFirst"
+- Grids: "GridFeaturedProducts", "GridCollections", "GridServiceCards", "GridPackages"
+- Story: "StorySplit", "StoryValueIcons", "StoryEditorialBand", "StoryFounder"
+- Trust: "TrustReviews", "TrustTestimonials", "TrustLogos", "TrustStats"
+- Media: "MediaGallery", "MediaVideo", "MediaBeforeAfter"
+- Conversion: "ConversionFAQ", "ConversionNewsletter", "ConversionQuoteCTA", "ConversionStickyPromo"
+- Footers: "FooterBasic", "FooterCommerce", "FooterService"
+
 ---
 
 ### **REQUIRED INSTRUCTIONS**
 Return ONLY a valid JSON object matching the exact structure below. No markdown formatting, no explanations, no code blocks (like \`\`\`json). Just the raw JSON. 
 
 1. Create a logical narrative flow for the page based on the business type.
-2. Select appropriate component types from the Allowed Components list. 
+2. Select appropriate component types from the Allowed Components list above. NEVER invent component types.
 3. Write high-converting, professional copy tailored to the Tone of Voice. 
 4. Provide appropriate royalty-free Unsplash image URLs based on the business category (e.g., https://source.unsplash.com/800x600/?plumbing). 
 5. CRITICAL: Based on the business category, select the appropriate \`stylePreset\` from the following exact string values: "milano" (luxury/beauty/boutique), "standard" (retail/services), "minimal" (tech/agency).
