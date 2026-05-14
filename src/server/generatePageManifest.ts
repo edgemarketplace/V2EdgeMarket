@@ -58,6 +58,18 @@ If multiple are selected, find a sophisticated blend (e.g., "Minimal Luxury" or 
 
 ---
 
+### **APPROVED PUCK COMPONENTS — use these exact type names**
+Headers: HeaderSimple, HeaderPromo, HeaderMega
+Heroes: HeroImageLeft, HeroFullVisual, HeroProductFirst, HeroServiceFirst
+Grids: GridFeaturedProducts, GridCollections, GridServiceCards, GridPackages
+Story: StorySplit, StoryValueIcons, StoryEditorialBand, StoryFounder
+Trust: TrustReviews, TrustTestimonials, TrustLogos, TrustStats
+Media: MediaGallery, MediaVideo, MediaBeforeAfter
+Conversion: ConversionFAQ, ConversionNewsletter, ConversionQuoteCTA, ConversionStickyPromo
+Footers: FooterBasic, FooterCommerce, FooterService
+
+---
+
 ### **OUTPUT REQUIREMENTS**
 Generate a JSON object where the keys are the page paths ("home", "about", "products", "contact") and the values are Puck data objects.
 

@@ -13,6 +13,17 @@ import { mapIntakeToPuckConfig } from './lib/ai-mapper';
 import { marketplaceService } from './lib/marketplaceService';
 import { EdgeRootProps, TemplateFamily, MarketplaceIntakeData } from './lib/types';
 
+const VALID_COMPONENT_TYPES = new Set([
+  'HeaderSimple', 'HeaderPromo', 'HeaderMega',
+  'HeroImageLeft', 'HeroFullVisual', 'HeroProductFirst', 'HeroServiceFirst',
+  'GridFeaturedProducts', 'GridCollections', 'GridServiceCards', 'GridPackages', 'GridProductDetail',
+  'StorySplit', 'StoryValueIcons', 'StoryEditorialBand', 'StoryFounder',
+  'TrustReviews', 'TrustTestimonials', 'TrustLogos', 'TrustStats',
+  'MediaGallery', 'MediaVideo', 'MediaBeforeAfter',
+  'ConversionFAQ', 'ConversionNewsletter', 'ConversionQuoteCTA', 'ConversionStickyPromo',
+  'FooterBasic', 'FooterCommerce', 'FooterService',
+]);
+
 import { Router, Route, Switch, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'motion/react';
 import { CartProvider } from './lib/cart';
@@ -100,14 +111,25 @@ export default function App() {
         // Ensure all pages have IDs
         Object.keys(siteContent).forEach(pageKey => {
           if (siteContent[pageKey].content) {
-            siteContent[pageKey].content = siteContent[pageKey].content.map((item: any, idx: number) => ({
-              ...item,
-              id: item.id || `${item.type}-${idx}-${Math.random().toString(36).substring(2, 9)}`,
-              props: {
-                ...item.props,
-                id: item.props?.id || item.id || `${item.type}-${idx}`
-              }
-            }));
+            // Phase 4 fix: filter out unknown component types from AI responses
+            const before = siteContent[pageKey].content.length;
+            siteContent[pageKey].content = siteContent[pageKey].content
+              .filter((item: any) => {
+                const valid = VALID_COMPONENT_TYPES.has(item.type);
+                if (!valid) console.warn(`[Editor] Stripping unknown component type: ${item.type}`);
+                return valid;
+              })
+              .map((item: any, idx: number) => ({
+                ...item,
+                id: item.id || `${item.type}-${idx}-${Math.random().toString(36).substring(2, 9)}`,
+                props: {
+                  ...item.props,
+                  id: item.props?.id || item.id || `${item.type}-${idx}`
+                }
+              }));
+            if (before > siteContent[pageKey].content.length) {
+              console.warn(`[Editor] Stripped ${before - siteContent[pageKey].content.length} unknown components from ${pageKey}`);
+            }
           }
         });
       } else {
