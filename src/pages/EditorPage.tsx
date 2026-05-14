@@ -207,8 +207,10 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <label className="text-[10px] flex items-center gap-2 cursor-pointer font-semibold uppercase tracking-[0.15em] text-[#1A1A1A] bg-black/[0.04] px-3 py-2 rounded border border-black/10 hover:bg-black/[0.07] transition-colors">
+                <label htmlFor="verified-responsive" className="text-[10px] flex items-center gap-2 cursor-pointer font-semibold uppercase tracking-[0.15em] text-[#1A1A1A] bg-black/[0.04] px-3 py-2 rounded border border-black/10 hover:bg-black/[0.07] transition-colors">
                   <input 
+                    id="verified-responsive"
+                    name="verifiedResponsive"
                     type="checkbox" 
                     className="w-4 h-4 cursor-pointer accent-black"
                     checked={mobileAck}
