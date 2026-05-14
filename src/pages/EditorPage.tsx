@@ -123,7 +123,7 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
   };
 
   return (
-    <div className="h-screen w-full flex bg-[#F9F8F6] font-sans border-8 border-white box-border overflow-hidden">
+    <div className="h-screen w-full flex bg-[#F9F8F6] font-sans box-border overflow-hidden">
        {/* Sidebar for Page Switching */}
        <aside className="w-64 border-r border-black/10 bg-white flex flex-col">
           <div className="p-8 border-b border-black/10 flex justify-between items-center">
@@ -133,7 +133,7 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
             </div>
             <button 
               onClick={addPage}
-              className="w-8 h-8 rounded-full border border-black/10 flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-sm"
+              className="w-8 h-8 rounded border border-black/15 flex items-center justify-center hover:bg-black hover:text-white transition-colors"
               title="Add Page"
             >
               <Plus className="w-4 h-4" />
@@ -145,10 +145,10 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
               <button
                 key={page.id}
                 onClick={() => handlePageChange(page.id)}
-                className={`w-full group flex items-center justify-between p-4 rounded-2xl transition-all ${
+                className={`w-full group flex items-center justify-between p-3 rounded-lg border transition-colors ${
                   activePage === page.id 
-                  ? 'bg-black text-white shadow-xl shadow-black/10' 
-                  : 'hover:bg-black/5 text-black/60'
+                  ? 'bg-black text-white border-black' 
+                  : 'bg-white text-black/70 border-black/10 hover:border-black/20 hover:bg-black/[0.02]'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -157,12 +157,15 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
                 </div>
                 <div className="flex items-center">
                   {page.id !== 'home' && (
-                    <div 
+                    <button
+                      type="button"
+                      aria-label={`Delete ${page.label} page`}
+                      title={`Delete ${page.label} page`}
                       onClick={(e) => deletePage(page.id, e)}
-                      className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all ${activePage === page.id ? 'text-white/40' : 'text-black/20'}`}
+                      className={`p-1 rounded border transition-colors ${activePage === page.id ? 'border-white/30 text-white hover:bg-white/10' : 'border-black/20 text-black/50 hover:bg-red-50 hover:border-red-300 hover:text-red-600'}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </div>
+                    </button>
                   )}
                   {activePage === page.id && page.id === 'home' && <ChevronRight className="w-4 h-4" />}
                   {activePage === page.id && page.id !== 'home' && <ChevronRight className="w-4 h-4 ml-1" />}
@@ -171,7 +174,7 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
             ))}
           </nav>
           
-          <div className="p-6 bg-black/5 m-4 rounded-3xl border border-black/5">
+          <div className="p-4 bg-black/[0.03] m-4 rounded border border-black/10">
              <p className="text-[10px] uppercase tracking-widest font-bold text-black/30 mb-2">Editor Tip</p>
              <p className="text-[11px] leading-relaxed text-black/60 italic">Navigation links between these pages are automatically synchronized.</p>
           </div>
@@ -203,8 +206,8 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
                   ))}
                 </div>
               </div>
-              <div className="flex items-center gap-10">
-                <label className="text-[10px] flex items-center gap-3 cursor-pointer font-bold uppercase tracking-[0.2em] text-[#1A1A1A] bg-black/5 px-4 py-3 rounded-full hover:bg-black/10 transition-colors">
+              <div className="flex items-center gap-4">
+                <label className="text-[10px] flex items-center gap-2 cursor-pointer font-semibold uppercase tracking-[0.15em] text-[#1A1A1A] bg-black/[0.04] px-3 py-2 rounded border border-black/10 hover:bg-black/[0.07] transition-colors">
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 cursor-pointer accent-black"
@@ -216,12 +219,21 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
                 
                 <button 
                   onClick={handlePublish}
-                  className="px-8 py-3 bg-black text-white text-[10px] uppercase font-bold tracking-widest shadow-lg shadow-black/20 hover:scale-105 active:scale-95 transition-all"
+                  className="px-4 py-2 bg-black text-white text-[10px] uppercase font-semibold tracking-[0.15em] rounded border border-black hover:bg-black/90 transition-colors"
                 >
                   Publish Site
                 </button>
               </div>
           </header>
+          
+          <div className="px-8 py-2 border-b border-black/10 bg-white">
+            <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.12em]">
+              <span className="px-2 py-1 rounded border border-black/15 text-black/70">Draft: In progress</span>
+              <span className="px-2 py-1 rounded border border-amber-300 text-amber-800 bg-amber-50">Inventory: Pending</span>
+              <span className="px-2 py-1 rounded border border-black/15 text-black/60">Checkout: Not configured</span>
+              <span className="px-2 py-1 rounded border border-black/15 text-black/60">Launch: Blocked</span>
+            </div>
+          </div>
           
           <div className="flex-1 overflow-hidden relative" key={activePage}>
               <Puck

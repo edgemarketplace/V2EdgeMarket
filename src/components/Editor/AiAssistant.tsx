@@ -131,7 +131,7 @@ export function AiAssistant({ currentData, businessDetails, onUpdate }: AiAssist
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center shadow-2xl hover:shadow-black/20 transition-shadow group relative"
+        className="w-12 h-12 bg-black text-white rounded flex items-center justify-center border border-black/20 hover:bg-black/90 transition-colors"
       >
         <AnimatePresence mode="wait">
           {isOpen ? (
@@ -155,9 +155,6 @@ export function AiAssistant({ currentData, businessDetails, onUpdate }: AiAssist
           )}
         </AnimatePresence>
         
-        {!isOpen && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-black border-2 border-white rounded-full animate-pulse" />
-        )}
       </motion.button>
     </div>
   );
