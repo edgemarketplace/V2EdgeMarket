@@ -82,6 +82,7 @@ export function EditorPage({ initialData, templateFamily, rootProps, onPublish }
               config={config}
               data={initialData}
               onPublish={handlePublish}
+              iframe={{ enabled: false }}
           />
        </div>
     </div>
