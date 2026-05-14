@@ -348,12 +348,24 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
         render: (props: any) => <Blocks.FooterBasic {...props} />
       },
       FooterCommerce: {
-        fields: { title: { type: "text" } },
+        fields: { 
+          title: { type: "text" },
+          description: { type: "textarea" },
+          shopLinks: { type: "array", arrayFields: { label: { type: "text" }, url: { type: "text" } } },
+          supportLinks: { type: "array", arrayFields: { label: { type: "text" }, url: { type: "text" } } },
+          socialLinks: { type: "array", arrayFields: { platform: { type: "text" }, url: { type: "text" } } }
+        },
         defaultProps: { title: "Brand" },
         render: (props: any) => <Blocks.FooterCommerce {...props} />
       },
       FooterService: {
-        fields: { title: { type: "text" } },
+        fields: { 
+          title: { type: "text" },
+          description: { type: "textarea" },
+          email: { type: "text" },
+          phone: { type: "text" },
+          address: { type: "textarea" }
+        },
         defaultProps: { title: "Brand" },
         render: (props: any) => <Blocks.FooterService {...props} />
       }
