@@ -98,6 +98,22 @@ export default function App() {
             }
           }));
         }
+        
+        // Merge the AI's generated root metadata (especially stylePreset) into the config
+        if (aiData.root) {
+          mappedConfig.rootProps = {
+            ...mappedConfig.rootProps,
+            ...aiData.root,
+            theme: {
+              ...mappedConfig.rootProps.theme,
+              ...(aiData.root.theme || {})
+            }
+          };
+          mappedConfig.initialData.root = {
+            ...mappedConfig.initialData.root,
+            ...aiData.root,
+          };
+        }
       }
       
       setEditorState({
