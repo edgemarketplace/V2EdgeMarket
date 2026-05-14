@@ -29,13 +29,15 @@ export const ConversionNewsletter = ({ heading, description }: { heading: string
   </div>
 );
 
-export const ConversionQuoteCTA = ({ title }: { title: string }) => (
+export const ConversionQuoteCTA = ({ title, description, ctaText }: { title: string, description?: string, ctaText?: string }) => (
   <div className="py-24 px-10 bg-[#1A1A1A] text-white border-b border-black/10">
     <div className="max-w-4xl mx-auto text-center">
       <h2 className="text-5xl font-serif italic mb-8">{title}</h2>
-      <p className="text-sm text-white/60 mb-12 max-w-2xl mx-auto font-light leading-relaxed">Ready to elevate your project? Get in touch with our team today to discuss your vision and receive a custom estimate.</p>
+      <p className="text-sm text-white/60 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
+        {description || "Ready to elevate your project? Get in touch with our team today to discuss your vision and receive a custom estimate."}
+      </p>
       <button className="px-10 py-5 bg-white text-black text-[11px] uppercase font-bold tracking-widest hover:bg-white/90 transition-all border border-white focus:outline-none">
-        Request a Quote
+        {ctaText || "Request a Quote"}
       </button>
     </div>
   </div>

@@ -1,42 +1,54 @@
 import React from 'react';
 
-export const GridFeaturedProducts = ({ title }: { title: string }) => (
-  <div className="py-24 px-10 bg-white border-b border-black/10">
-    <div className="max-w-6xl mx-auto">
-      <h2 className="text-4xl font-serif italic mb-12 text-center text-[#1A1A1A]">{title}</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="group cursor-pointer">
-            <div className="aspect-[3/4] mb-6 bg-[#F9F8F6] border border-black/5 flex items-center justify-center overflow-hidden">
-               <span className="text-[10px] font-bold uppercase tracking-widest opacity-30">Product {i}</span>
+export const GridFeaturedProducts = ({ title, items }: { title: string, items?: { name: string, price: string, category: string, image?: string }[] }) => {
+  const defaultItems = [1, 2, 3, 4].map(i => ({ name: `Item Name ${i}`, price: "$99", category: "Category Name", image: "" }));
+  const products = items || defaultItems;
+  return (
+    <div className="py-24 px-10 bg-white border-b border-black/10">
+      <div className="max-w-6xl mx-auto">
+        <h2 className="text-4xl font-serif italic mb-12 text-center text-[#1A1A1A]">{title}</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+          {products.map((item, i) => (
+            <div key={i} className="group cursor-pointer">
+              <div className="aspect-[3/4] mb-6 bg-[#F9F8F6] border border-black/5 flex items-center justify-center overflow-hidden">
+                {item.image ? (
+                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-30">Product {i+1}</span>
+                )}
+              </div>
+              <div className="flex justify-between items-baseline mb-2">
+                <h3 className="text-sm font-bold uppercase tracking-tight text-[#1A1A1A] group-hover:underline">{item.name}</h3>
+                <p className="text-sm font-serif italic text-[#1A1A1A]">{item.price}</p>
+              </div>
+              <p className="text-[11px] text-black/50">{item.category}</p>
             </div>
-            <div className="flex justify-between items-baseline mb-2">
-              <h3 className="text-sm font-bold uppercase tracking-tight text-[#1A1A1A] group-hover:underline">Item Name {i}</h3>
-              <p className="text-sm font-serif italic text-[#1A1A1A]">$99</p>
-            </div>
-            <p className="text-[11px] text-black/50">Category Name</p>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
-export const GridCollections = ({ title }: { title: string }) => (
-  <div className="py-20 px-10 bg-[#F9F8F6] border-b border-black/10">
-    <div className="max-w-6xl mx-auto">
-      <h2 className="text-4xl font-serif italic mb-12 text-[#1A1A1A]">{title}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {[1, 2].map(i => (
-          <div key={i} className="relative aspect-[16/9] bg-white border border-black/10 flex items-center justify-center overflow-hidden group cursor-pointer">
-            <div className="absolute inset-0 bg-black/5 group-hover:bg-black/10 transition-colors z-0"></div>
-            <h3 className="relative z-10 text-3xl font-serif italic text-[#1A1A1A] bg-white px-8 py-4 border border-black/10">Collection {i}</h3>
-          </div>
-        ))}
+export const GridCollections = ({ title, items }: { title: string, items?: { title: string, image?: string }[] }) => {
+  const collections = items || [1, 2].map(i => ({ title: `Collection ${i}`, image: "" }));
+  return (
+    <div className="py-20 px-10 bg-[#F9F8F6] border-b border-black/10">
+      <div className="max-w-6xl mx-auto">
+        <h2 className="text-4xl font-serif italic mb-12 text-[#1A1A1A]">{title}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {collections.map((item, i) => (
+            <div key={i} className="relative aspect-[16/9] bg-white border border-black/10 flex items-center justify-center overflow-hidden group cursor-pointer">
+              {item.image && <img src={item.image} alt={item.title} className="absolute inset-0 w-full h-full object-cover opacity-80" />}
+              <div className="absolute inset-0 bg-black/5 group-hover:bg-black/10 transition-colors z-0"></div>
+              <h3 className="relative z-10 text-3xl font-serif italic text-[#1A1A1A] bg-white px-8 py-4 border border-black/10">{item.title}</h3>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const GridServiceCards = ({ title, description, items }: { title: string, description: string, items?: { title: string, description: string, image?: string }[] }) => (
   <div className="py-20 px-10 border-b border-black/10 bg-[#F9F8F6]">

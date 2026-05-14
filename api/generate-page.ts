@@ -69,11 +69,12 @@ You MUST use ONLY these exact strings for the "type" property in the content arr
 ### **REQUIRED INSTRUCTIONS**
 Return ONLY a valid JSON object matching the exact structure below. No markdown formatting, no explanations, no code blocks (like \`\`\`json). Just the raw JSON. 
 
-1. Create a logical narrative flow for the page based on the business type.
+1. Create a logical, high-converting narrative flow for the page based on the business type and elevator pitch.
 2. Select appropriate component types from the Allowed Components list above. NEVER invent component types.
 3. Write high-converting, professional copy tailored to the Tone of Voice. 
-4. Provide appropriate royalty-free Unsplash image URLs based on the business category (e.g., https://source.unsplash.com/800x600/?plumbing). 
-5. CRITICAL: Based on the business category, select the appropriate \`stylePreset\` from the following exact string values: "milano" (luxury/beauty/boutique), "standard" (retail/services), "minimal" (tech/agency).
+4. The Primary Goal is CRITICAL. You MUST design the site so that the main Call to Actions (in the Hero, the Conversion CTA, and Packages) drive the user towards this goal (e.g., "Request a Quote", "Book Now", "Buy Online").
+5. For imagery, source.unsplash.com is deprecated. Instead, generate HIGHLY DESCRIPTIVE, hyper-realistic image prompts using this format: "https://image.pollinations.ai/prompt/{URL-encoded-descriptive-prompt}?width=1200&height=800&nologo=true". Example: "https://image.pollinations.ai/prompt/luxury%20modern%20epoxy%20garage%20floor%20with%20sports%20car?width=1200&height=800&nologo=true"
+6. CRITICAL: Based on the business category, select the appropriate \`stylePreset\` from the following exact string values: "milano" (luxury/beauty/boutique), "standard" (retail/services), "minimal" (tech/agency).
 
 ---
 

@@ -153,12 +153,32 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
       
       // GRIDS
       GridFeaturedProducts: {
-        fields: { title: { type: "text" } },
+        fields: { 
+          title: { type: "text" },
+          items: {
+            type: "array",
+            arrayFields: {
+              name: { type: "text" },
+              price: { type: "text" },
+              category: { type: "text" },
+              image: { type: "text" }
+            }
+          }
+        },
         defaultProps: { title: "Featured Products" },
         render: (props: any) => <Blocks.GridFeaturedProducts {...props} />
       },
       GridCollections: {
-        fields: { title: { type: "text" } },
+        fields: { 
+          title: { type: "text" },
+          items: {
+            type: "array",
+            arrayFields: {
+              title: { type: "text" },
+              image: { type: "text" }
+            }
+          }
+        },
         defaultProps: { title: "Collections" },
         render: (props: any) => <Blocks.GridCollections {...props} />
       },
@@ -220,12 +240,34 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
       
       // TRUST
       TrustReviews: {
-        fields: { title: { type: "text" } },
+        fields: { 
+          title: { type: "text" },
+          reviews: {
+            type: "array",
+            arrayFields: {
+              quote: { type: "textarea" },
+              author: { type: "text" },
+              location: { type: "text" },
+              rating: { type: "number" }
+            }
+          }
+        },
         defaultProps: { title: "Customer Reviews" },
         render: (props: any) => <Blocks.TrustReviews {...props} />
       },
       TrustTestimonials: {
-        fields: { title: { type: "text" } },
+        fields: { 
+          title: { type: "text" },
+          testimonials: {
+            type: "array",
+            arrayFields: {
+              quote: { type: "textarea" },
+              author: { type: "text" },
+              company: { type: "text" },
+              image: { type: "text" }
+            }
+          }
+        },
         defaultProps: { title: "Client Testimonials" },
         render: (props: any) => <Blocks.TrustTestimonials {...props} />
       },
@@ -285,8 +327,12 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
         render: (props: any) => <Blocks.ConversionNewsletter {...props} />
       },
       ConversionQuoteCTA: {
-        fields: { title: { type: "text" } },
-        defaultProps: { title: "Start Your Project" },
+        fields: { 
+          title: { type: "text" },
+          description: { type: "textarea" },
+          ctaText: { type: "text" }
+        },
+        defaultProps: { title: "Get Started" },
         render: (props: any) => <Blocks.ConversionQuoteCTA {...props} />
       },
       ConversionStickyPromo: {
