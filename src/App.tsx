@@ -114,6 +114,9 @@ export default function App() {
             ...aiData.root,
           };
         }
+      } else {
+        console.error("AI Generation failed with status:", response.status);
+        console.error("Error details:", await response.text());
       }
       
       setEditorState({

@@ -7,5 +7,6 @@ app.use(express.json());
 
 // Vercel routes everything under /api here based on vercel.json rewrite
 app.use("/api", apiRouter);
+app.use("/", apiRouter);
 
 export default app;
