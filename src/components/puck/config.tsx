@@ -19,17 +19,19 @@ type Props = {
   HeroImageLeft: { heading: string; subheading: string; ctaText?: string; image?: string };
   HeroFullVisual: { heading: string; subheading: string; ctaText?: string; padding?: "normal" | "large"; image?: string };
   HeroProductFirst: { heading: string; price: string; ctaText?: string; image?: string };
+  HeroProductDetail?: { name: string; price: string; description: string; image?: string; features?: { label: string }[] };
   HeroServiceFirst: { heading: string; subheading: string; services?: { label: string }[]; image?: string };
-  GridFeaturedProducts: { title: string };
-  GridCollections: { title: string };
+  GridFeaturedProducts: { title: string; items?: { name: string; price: string; category: string; image: string }[] };
+  GridCollections: { title: string; items?: { title: string; image: string }[] };
   GridServiceCards: { title: string; description: string; items?: { title: string; description: string; image?: string }[] };
   GridPackages: { title: string; items?: { name: string; price: string; features: { label: string }[]; ctaText?: string }[] };
+  GridProductDetail: { name: string; price: string; description: string; image?: string; features?: { label: string }[] };
   StorySplit: { headline: string; body: string; image?: string };
   StoryValueIcons: { headline: string };
   StoryEditorialBand: { quote: string; author: string };
   StoryFounder: { name: string; bio: string; image?: string };
-  TrustReviews: { title: string };
-  TrustTestimonials: { title: string };
+  TrustReviews: { title: string; reviews?: { quote: string; author: string; location: string; rating: number }[] };
+  TrustTestimonials: { title: string; testimonials?: { quote: string; author: string; company: string; image: string }[] };
   TrustLogos: {};
   TrustStats: { title: string };
   MediaGallery: { title: string; images?: { image: string }[] };
@@ -45,19 +47,31 @@ type Props = {
   };
   ConversionFAQ: { questions?: { q: string; a: string }[] };
   ConversionNewsletter: { heading: string; description: string };
-  ConversionQuoteCTA: { title: string };
+  ConversionQuoteCTA: { title: string; description?: string; ctaText?: string };
   ConversionStickyPromo: { text: string };
   FooterBasic: { text: string };
-  FooterCommerce: { title: string };
-  FooterService: { title: string };
+  FooterCommerce: { title: string; description?: string; shopLinks?: { label: string; url: string }[]; supportLinks?: { label: string; url: string }[]; socialLinks?: { platform: string; url: string }[] };
+  FooterService: { title: string; description?: string; email?: string; phone?: string; address?: string };
 };
 
 export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, EdgeRootProps> {
   return {
+    viewports: [
+      {
+        width: 1280,
+        label: "Desktop",
+        icon: <div className="w-4 h-4 border-2 border-current rounded-sm" />
+      },
+      {
+        width: 375,
+        label: "Mobile",
+        icon: <div className="w-3 h-5 border-2 border-current rounded-md" />
+      }
+    ],
     categories: {
       headers: { components: ["HeaderSimple", "HeaderPromo", "HeaderMega"], title: "Headers" },
       heroes: { components: ["HeroImageLeft", "HeroFullVisual", "HeroProductFirst", "HeroServiceFirst"], title: "Heroes" },
-      grids: { components: ["GridFeaturedProducts", "GridCollections", "GridServiceCards", "GridPackages"], title: "Product/Service grids" },
+      grids: { components: ["GridFeaturedProducts", "GridCollections", "GridServiceCards", "GridPackages", "GridProductDetail"], title: "Product/Service grids" },
       story: { components: ["StorySplit", "StoryValueIcons", "StoryEditorialBand", "StoryFounder"], title: "Story/content" },
       trust: { components: ["TrustReviews", "TrustTestimonials", "TrustLogos", "TrustStats"], title: "Trust/proof" },
       media: { components: ["MediaGallery", "MediaVideo", "MediaBeforeAfter"], title: "Media" },
@@ -187,7 +201,7 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
         defaultProps: { title: "Services", description: "What we offer." },
         render: (props: any) => <Blocks.GridServiceCards {...props} />
       },
-      GridPackages: {
+      GridPackages: { 
         fields: { 
           title: { type: "text" },
           items: {
@@ -214,6 +228,17 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
           ]
         },
         render: (props: any) => <Blocks.GridPackages {...props} />
+      },
+      GridProductDetail: {
+        fields: { 
+          name: { type: "text" }, 
+          price: { type: "text" }, 
+          description: { type: "textarea" }, 
+          image: { type: "text" },
+          features: { type: "array", arrayFields: { label: { type: "text" } } }
+        },
+        defaultProps: { name: "Product Name", price: "$99", description: "Detailed description." },
+        render: (props: any) => <Blocks.GridProductDetail {...props} />
       },
       
       // STORY

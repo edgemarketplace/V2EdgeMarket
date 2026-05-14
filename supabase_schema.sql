@@ -16,7 +16,8 @@ create table public.marketplaces (
     inventory_method text,
     inventory_raw_content text,
     inventory_file_name text,
-    plan text default 'launch'
+    plan text default 'launch',
+    content jsonb
 );
 
 -- Create Inventory Items Table

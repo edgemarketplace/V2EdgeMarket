@@ -1,6 +1,8 @@
 import React from 'react';
+import { useCart } from '../../../lib/cart';
 
 export const GridFeaturedProducts = ({ title, items }: { title: string, items?: { name: string, price: string, category: string, image?: string }[] }) => {
+  const { addItem } = useCart();
   const defaultItems = [1, 2, 3, 4].map(i => ({ name: `Item Name ${i}`, price: "$99", category: "Category Name", image: "" }));
   const products = items || defaultItems;
   return (
@@ -9,7 +11,11 @@ export const GridFeaturedProducts = ({ title, items }: { title: string, items?: 
         <h2 className="text-4xl font-serif italic mb-12 text-center text-[#1A1A1A]">{title}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
           {products.map((item, i) => (
-            <div key={i} className="group cursor-pointer">
+            <div 
+              key={i} 
+              className="group cursor-pointer"
+              onClick={() => addItem({ id: `prod-${i}`, name: item.name, price: item.price, image: item.image })}
+            >
               <div className="aspect-[3/4] mb-6 bg-[#F9F8F6] border border-black/5 flex items-center justify-center overflow-hidden">
                 {item.image ? (
                   <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -86,6 +92,7 @@ export const GridPackages = ({ title, items }: { title: string, items?: { name: 
   ];
 
   const packages = items || defaultItems;
+  const { addItem } = useCart();
 
   return (
     <div className="py-24 px-10 bg-white border-b border-black/10">
@@ -107,11 +114,52 @@ export const GridPackages = ({ title, items }: { title: string, items?: { name: 
                   </li>
                 ))}
               </ul>
-              <button className={`w-full py-4 text-[10px] uppercase font-bold tracking-widest transition-all border ${i === 1 ? 'bg-white text-black hover:bg-white/90 border-white' : 'bg-transparent text-black hover:bg-black/5 border-black/20'}`}>
+              <button 
+                onClick={() => addItem({ id: `pkg-${i}`, name: pkg.name, price: pkg.price })}
+                className={`w-full py-4 text-[10px] uppercase font-bold tracking-widest transition-all border ${i === 1 ? 'bg-white text-black hover:bg-white/90 border-white' : 'bg-transparent text-black hover:bg-black/5 border-black/20'}`}
+              >
                 {pkg.ctaText || 'Select'}
               </button>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const GridProductDetail = ({ name, price, description, image, features }: { name: string; price: string; description: string; image?: string; features?: { label: string }[] }) => {
+  const { addItem } = useCart();
+  const defaultImage = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=800";
+  
+  return (
+    <div className="py-24 px-10 bg-white">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+        <div className="aspect-square bg-black/5 overflow-hidden border border-black/5">
+          <img src={image || defaultImage} alt={name} className="w-full h-full object-cover" />
+        </div>
+        <div>
+          <h1 className="text-6xl font-serif italic mb-4 text-[#1A1A1A]">{name || 'Product Name'}</h1>
+          <p className="text-3xl font-serif mb-8 text-black/60">{price || '$0.00'}</p>
+          <p className="text-lg text-black/70 mb-10 leading-relaxed">{description || 'Detailed product description goes here. Explain why this item is special.'}</p>
+          
+          {features && (
+            <ul className="space-y-4 mb-12">
+              {features.map((feat, i) => (
+                <li key={i} className="flex items-center gap-3 text-sm text-black/60">
+                  <div className="w-1.5 h-1.5 rounded-full bg-black/20" />
+                  {feat.label}
+                </li>
+              ))}
+            </ul>
+          )}
+          
+          <button 
+            onClick={() => addItem({ id: 'current-product', name: name || 'Product', price: price || '$0.00', image: image || defaultImage })}
+            className="px-12 py-5 bg-black text-white text-xs font-bold uppercase tracking-[0.2em] shadow-2xl shadow-black/20 hover:scale-105 active:scale-95 transition-all"
+          >
+            Add to Bag
+          </button>
         </div>
       </div>
     </div>

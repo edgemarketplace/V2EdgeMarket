@@ -145,6 +145,39 @@ export function Onboarding({ onComplete }: { onComplete: (data: MarketplaceIntak
                 </div>
               </div>
 
+              <div>
+                <label className="block text-[10px] uppercase font-bold tracking-widest mb-4 text-black/50">Creative Direction (Select Multiple)</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { id: 'minimalist', label: 'Minimalist' },
+                    { id: 'luxury', label: 'Luxury' },
+                    { id: 'bold', label: 'Bold' },
+                    { id: 'friendly', label: 'Friendly' },
+                    { id: 'professional', label: 'Pro' },
+                    { id: 'industrial', label: 'Industrial' },
+                    { id: 'artistic', label: 'Artistic' },
+                    { id: 'dark', label: 'Dark Mode' },
+                  ].map((t) => (
+                    <label 
+                      key={t.id} 
+                      className={`flex flex-col items-center justify-center p-3 border cursor-pointer transition-all ${
+                        (watch('tone') || []).includes(t.id)
+                        ? 'bg-black text-white border-black shadow-lg shadow-black/10'
+                        : 'bg-transparent text-black/40 border-black/5 hover:border-black/20'
+                      }`}
+                    >
+                      <input 
+                        type="checkbox"
+                        value={t.id}
+                        {...register("tone")}
+                        className="hidden"
+                      />
+                      <span className="text-[9px] uppercase font-bold tracking-tighter text-center">{t.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <div className="pt-8">
                 <button 
                   type="button"

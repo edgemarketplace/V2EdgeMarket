@@ -107,10 +107,20 @@ export interface MarketplaceIntakeData {
   primaryGoal: CommerceMode;
   targetAudience?: string;
   brandVibe?: string;
-  tone?: string;
+  tone?: string[];
   contactEmail?: string;
   contactPhone?: string;
   serviceArea?: string;
   brandColor?: string;
   inventory?: InventoryData;
+  puckContent?: { [key: string]: any }; // Map of path -> puck data
 }
+
+export type PageType = 'home' | 'about' | 'products' | 'product-detail' | 'contact';
+
+export interface PagePreset {
+  type: PageType;
+  path: string;
+  recommendedStack: string[];
+}
+

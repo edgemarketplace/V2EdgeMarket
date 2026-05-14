@@ -19,6 +19,7 @@ export const marketplaceService = {
           inventory_method: data.inventory?.method || 'text',
           inventory_raw_content: data.inventory?.content,
           inventory_file_name: data.inventory?.fileName,
+          content: data.puckContent
         }
       ])
       .select()
