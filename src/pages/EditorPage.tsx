@@ -5,6 +5,7 @@ import { createPuckConfig } from '../components/puck/config';
 import { EdgeRootProps, TemplateFamily } from '../lib/types';
 import { validateEditorContent } from '../lib/validation';
 import { AiAssistant } from '../components/Editor/AiAssistant';
+import { WORKFLOW_STEPS } from '../lib/workflowSteps';
 import { Layout, FileText, ShoppingBag, Mail, Home, ChevronRight, Plus, Trash2 } from 'lucide-react';
 
 interface EditorPageProps {
@@ -183,6 +184,24 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
                   {pageList.find(p => p.id === activePage)?.label}
                 </h1>
                 <p className="text-xs uppercase tracking-[0.2em] mt-2 font-semibold text-black/50">Editing: {rootProps.title}</p>
+                <div className="mt-4 flex items-center gap-2">
+                  {WORKFLOW_STEPS.map((step, index) => (
+                    <React.Fragment key={step.id}>
+                      <div
+                        className={`px-2.5 py-1 rounded border text-[10px] uppercase tracking-wider font-semibold ${
+                          step.id === 'content'
+                            ? 'bg-black text-white border-black'
+                            : 'bg-white text-black/55 border-black/15'
+                        }`}
+                        title={step.helper}
+                        aria-label={`Workflow step: ${step.label}`}
+                      >
+                        {step.label}
+                      </div>
+                      {index < WORKFLOW_STEPS.length - 1 && <span className="text-black/25 text-xs">→</span>}
+                    </React.Fragment>
+                  ))}
+                </div>
               </div>
               <div className="flex items-center gap-10">
                 <label className="text-[10px] flex items-center gap-3 cursor-pointer font-bold uppercase tracking-[0.2em] text-[#1A1A1A] bg-black/5 px-4 py-3 rounded-full hover:bg-black/10 transition-colors">
