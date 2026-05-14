@@ -73,7 +73,7 @@ Return ONLY a valid JSON object matching the exact structure below. No markdown 
 2. Select appropriate component types from the Allowed Components list above. NEVER invent component types.
 3. Write high-converting, professional copy tailored to the Tone of Voice. 
 4. The Primary Goal is CRITICAL. You MUST design the site so that the main Call to Actions (in the Hero, the Conversion CTA, and Packages) drive the user towards this goal (e.g., "Request a Quote", "Book Now", "Buy Online").
-5. For imagery, source.unsplash.com is deprecated. Instead, generate HIGHLY DESCRIPTIVE, hyper-realistic image prompts using this format: "https://image.pollinations.ai/prompt/{URL-encoded-descriptive-prompt}?width=1200&height=800&nologo=true". Example: "https://image.pollinations.ai/prompt/luxury%20modern%20epoxy%20garage%20floor%20with%20sports%20car?width=1200&height=800&nologo=true"
+5. For imagery, source.unsplash.com is completely deprecated. You must use REAL, KNOWN Unsplash photo IDs. Format: "https://images.unsplash.com/photo-{REAL_PHOTO_ID}?q=80&w=1200&auto=format&fit=crop". Do NOT invent fake IDs. If you do not know a real photo ID for the specific niche, use a high-quality, real photo ID of a beautiful architectural space, office, or texture that you know exists. Example: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1200&auto=format&fit=crop".
 6. CRITICAL: Based on the business category, select the appropriate \`stylePreset\` from the following exact string values: "milano" (luxury/beauty/boutique), "standard" (retail/services), "minimal" (tech/agency).
 
 ---
