@@ -21,6 +21,12 @@ function buildInventoryContext(intake: MarketplaceIntakeData) {
   return 'No inventory details were supplied.';
 }
 
+function normalizeTone(tone: MarketplaceIntakeData['tone']) {
+  if (!tone) return '';
+  if (Array.isArray(tone)) return tone.filter(Boolean).join(', ');
+  return tone;
+}
+
 function buildPrompt(intake: MarketplaceIntakeData) {
   return `**System Prompt: Edge Marketplace Hub — AI Multi-Page Architect**
 
@@ -42,7 +48,7 @@ Create a cohesive site structure with inter-linked navigation.
 *   **Category:** ${intake.businessType}
 *   **Offerings:** ${intake.offerings}
 *   **Primary Goal:** ${intake.primaryGoal}
-*   **Creative Direction:** ${(intake.tone || []).join(', ')}
+*   **Creative Direction:** ${normalizeTone(intake.tone)}
 
 ---
 

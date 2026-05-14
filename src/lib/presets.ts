@@ -1,6 +1,6 @@
-import { PageType } from './types';
+type PageType = 'home' | 'about' | 'products' | 'product-detail' | 'contact';
 
-export const PAGE_PRESETS: { [key in PageType]: any } = {
+export const PAGE_PRESETS: Record<PageType, any> = {
   home: {
     content: [
       { type: 'Header', props: { navLinks: [{ label: 'About', href: '/about' }, { label: 'Products', href: '/products' }, { label: 'Contact', href: '/contact' }] } },

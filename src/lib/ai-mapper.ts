@@ -1,5 +1,5 @@
 import { TEMPLATE_MANIFESTS } from './section-manifest';
-import { EdgeRootProps, EditorContentBlock, MarketplaceIntakeData, TemplateFamily } from './types';
+import { EdgeRootProps, EditorContentBlock, MarketplaceIntakeData, TemplateFamily, CommerceMode } from './types';
 
 function buildCta(primaryGoal: MarketplaceIntakeData['primaryGoal']) {
   switch (primaryGoal) {

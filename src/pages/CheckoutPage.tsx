@@ -49,7 +49,7 @@ export function CheckoutPage({
       if (siteToken) {
         await fetch(`/api/sites/${siteId}/checkout-intents`, {
           method: 'POST',
-          headers: buildSiteHeaders({ ...draft, siteId, siteToken }),
+          headers: buildSiteHeaders(siteToken || draft.siteToken),
           body: JSON.stringify({
             customerName: ownerName,
             email,
@@ -62,7 +62,7 @@ export function CheckoutPage({
       const response = await fetch(`/api/sites/${siteId}/deploy`, {
         method: 'POST',
         headers: {
-          ...buildSiteHeaders({ ...draft, siteId, siteToken }),
+          ...buildSiteHeaders(siteToken || draft.siteToken),
           'x-idempotency-key': idempotencyKey,
         },
         body: JSON.stringify({
