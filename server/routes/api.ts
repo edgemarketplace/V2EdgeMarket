@@ -1,5 +1,6 @@
 import { Router } from "express";
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { db } from "../../src/db";
 import { sql } from "drizzle-orm";
 
@@ -132,7 +133,6 @@ Output **only** the requested valid JSON structure without markdown wrappers or 
     let data;
 
     if (geminiApiKey) {
-      const { GoogleGenAI } = await import("@google/genai");
       const ai = new GoogleGenAI({ apiKey: geminiApiKey });
       
       const result = await ai.models.generateContent({
