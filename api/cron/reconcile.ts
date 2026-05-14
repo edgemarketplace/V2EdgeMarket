@@ -6,6 +6,8 @@ export const config = {
 };
 
 export default async function handler(_req: any, res: any) {
+  res.setHeader('x-cron-probe', 'true');
+
   return res.status(200).json({
     ok: true,
     probe: 'cron-minimal',
