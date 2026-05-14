@@ -73,3 +73,15 @@ create table if not exists deployments (
   vercel_deployment_id text,
   history jsonb not null default '[]'::jsonb
 );
+
+create table if not exists subdomain_reservations (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  site_id uuid not null references marketplaces(id) on delete cascade,
+  subdomain text not null unique,
+  full_domain text not null unique,
+  cloudflare_record_id text,
+  status text not null check (status in ('reserved', 'provisioning', 'active', 'failed')) default 'reserved',
+  reserved_at timestamptz not null default now(),
+  provisioned_at timestamptz
+);

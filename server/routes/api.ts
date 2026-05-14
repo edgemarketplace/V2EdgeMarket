@@ -405,4 +405,72 @@ router.put('/sites/:siteId/workflow', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════
+// Cloudflare Subdomain Automation endpoints (Priority 5)
+// ═══════════════════════════════════════════════════════════════════
+
+import { reserveSubdomain, provisionDnsRecord, getSiteSubdomain } from '../../src/server/cloudflare';
+
+// POST /api/sites/:siteId/reserve-subdomain — Reserve a subdomain
+router.post('/sites/:siteId/reserve-subdomain', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    
+    const draft = await getMarketplaceDraftSnapshot(req.params.siteId);
+    if (!draft) {
+      res.status(404).json({ error: 'Draft not found.' });
+      return;
+    }
+
+    const result = await reserveSubdomain(req.params.siteId, draft.intakeData.businessName);
+    
+    if ('error' in result) {
+      res.status(400).json(result);
+      return;
+    }
+
+    res.status(201).json(result);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// GET /api/sites/:siteId/subdomain — Get reserved subdomain
+router.get('/sites/:siteId/subdomain', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    
+    const fullDomain = await getSiteSubdomain(req.params.siteId);
+    
+    if (!fullDomain) {
+      res.status(404).json({ error: 'No subdomain reserved for this site.' });
+      return;
+    }
+
+    res.json({ fullDomain });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// POST /api/sites/:siteId/provision-dns — Provision DNS via Cloudflare
+router.post('/sites/:siteId/provision-dns', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    
+    const fullDomain = await getSiteSubdomain(req.params.siteId);
+    if (!fullDomain) {
+      res.status(400).json({ error: 'No subdomain reserved. Reserve one first.' });
+      return;
+    }
+
+    const subdomain = fullDomain.split('.')[0];
+    const result = await provisionDnsRecord(subdomain);
+    
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
 export default router;
