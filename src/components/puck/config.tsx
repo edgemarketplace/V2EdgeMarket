@@ -11,7 +11,7 @@ import * as Footer from "./blocks/Footer";
 import {
   commerceComponentConfigs,
   commerceCategories,
-} from "../../../packages/edge-commerce/src/index";
+} from "../../components/commerce";
 
 // Combine for easy access if needed, or use specific ones
 const Blocks = { ...Header, ...Hero, ...Grid, ...Story, ...Trust, ...Media, ...Conversion, ...Footer };

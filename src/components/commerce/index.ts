@@ -12,20 +12,20 @@
  */
 
 // Product-oriented components
-export { FeaturedProduct, featuredProductConfig } from './components/products/FeaturedProduct';
-export { ProductGrid, productGridConfig } from './components/products/ProductGrid';
-export { ProductCarousel, productCarouselConfig } from './components/products/ProductCarousel';
-export { ProductComparison, productComparisonConfig } from './components/products/ProductComparison';
+export { FeaturedProduct, featuredProductConfig } from './products/FeaturedProduct';
+export { ProductGrid, productGridConfig } from './products/ProductGrid';
+export { ProductCarousel, productCarouselConfig } from './products/ProductCarousel';
+export { ProductComparison, productComparisonConfig } from './products/ProductComparison';
 
 // Service-oriented components
-export { ServiceCard, serviceCardConfig } from './components/services/ServiceCard';
-export { ServicePackages, servicePackagesConfig } from './components/services/ServicePackages';
-export { AvailabilitySection, availabilitySectionConfig } from './components/services/AvailabilitySection';
-export { BeforeAfterGallery, beforeAfterGalleryConfig } from './components/services/BeforeAfterGallery';
+export { ServiceCard, serviceCardConfig } from './services/ServiceCard';
+export { ServicePackages, servicePackagesConfig } from './services/ServicePackages';
+export { AvailabilitySection, availabilitySectionConfig } from './services/AvailabilitySection';
+export { BeforeAfterGallery, beforeAfterGalleryConfig } from './services/BeforeAfterGallery';
 
 // Booking-oriented components
-export { BookingCTA, bookingCTACConfig } from './components/booking/BookingCTA';
-export { QuoteEstimator, quoteEstimatorConfig } from './components/booking/QuoteEstimator';
+export { BookingCTA, bookingCTACConfig } from './booking/BookingCTA';
+export { QuoteEstimator, quoteEstimatorConfig } from './booking/QuoteEstimator';
 
 /**
  * Component registry for Puck config
