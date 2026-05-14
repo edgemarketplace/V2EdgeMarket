@@ -1,5 +1,5 @@
 import type { Config } from "@measured/puck";
-import { EdgeRootProps, TemplateFamily } from "../../lib/types";
+import { EdgeRootProps, PuckComponentPropsMap, TemplateFamily } from "../../lib/types";
 import * as Header from "./blocks/Header";
 import * as Hero from "./blocks/Hero";
 import * as Grid from "./blocks/Grid";
@@ -12,45 +12,7 @@ import * as Footer from "./blocks/Footer";
 // Combine for easy access if needed, or use specific ones
 const Blocks = { ...Header, ...Hero, ...Grid, ...Story, ...Trust, ...Media, ...Conversion, ...Footer };
 
-type Props = {
-  HeaderSimple: { title: string; navLinks?: { label: string; href: string }[] };
-  HeaderPromo: { promoText: string; title: string };
-  HeaderMega: { title: string };
-  HeroImageLeft: { heading: string; subheading: string; ctaText?: string; image?: string };
-  HeroFullVisual: { heading: string; subheading: string; ctaText?: string; padding?: "normal" | "large"; image?: string };
-  HeroProductFirst: { heading: string; price: string; ctaText?: string; image?: string };
-  HeroServiceFirst: { heading: string; subheading: string; services?: { label: string }[]; image?: string };
-  GridFeaturedProducts: { title: string };
-  GridCollections: { title: string };
-  GridServiceCards: { title: string; description: string; items?: { title: string; description: string; image?: string }[] };
-  GridPackages: { title: string; items?: { name: string; price: string; features: { label: string }[]; ctaText?: string }[] };
-  StorySplit: { headline: string; body: string; image?: string };
-  StoryValueIcons: { headline: string };
-  StoryEditorialBand: { quote: string; author: string };
-  StoryFounder: { name: string; bio: string; image?: string };
-  TrustReviews: { title: string };
-  TrustTestimonials: { title: string };
-  TrustLogos: {};
-  TrustStats: { title: string };
-  MediaGallery: { title: string; images?: { image: string }[] };
-  MediaVideo: { title: string };
-  MediaBeforeAfter: { 
-    title: string; 
-    beforeImage?: string; 
-    afterImage?: string; 
-    beforeLabel?: string; 
-    afterLabel?: string;
-    beforeDescription?: string;
-    afterDescription?: string;
-  };
-  ConversionFAQ: { questions?: { q: string; a: string }[] };
-  ConversionNewsletter: { heading: string; description: string };
-  ConversionQuoteCTA: { title: string };
-  ConversionStickyPromo: { text: string };
-  FooterBasic: { text: string };
-  FooterCommerce: { title: string };
-  FooterService: { title: string };
-};
+type Props = PuckComponentPropsMap;
 
 export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, EdgeRootProps> {
   return {
@@ -155,6 +117,13 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
       GridFeaturedProducts: {
         fields: { 
           title: { type: "text" },
+          dataSource: { 
+            type: "select",
+            options: [
+              { label: "Manual (static items)", value: "manual" },
+              { label: "Inventory (live products)", value: "inventory" }
+            ]
+          },
           items: {
             type: "array",
             arrayFields: {
@@ -165,12 +134,19 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
             }
           }
         },
-        defaultProps: { title: "Featured Products" },
+        defaultProps: { title: "Featured Products", dataSource: "manual" },
         render: (props: any) => <Blocks.GridFeaturedProducts {...props} />
       },
       GridCollections: {
         fields: { 
           title: { type: "text" },
+          dataSource: { 
+            type: "select",
+            options: [
+              { label: "Manual (static items)", value: "manual" },
+              { label: "Inventory (live products)", value: "inventory" }
+            ]
+          },
           items: {
             type: "array",
             arrayFields: {
@@ -179,17 +155,30 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
             }
           }
         },
-        defaultProps: { title: "Collections" },
+        defaultProps: { title: "Collections", dataSource: "manual" },
         render: (props: any) => <Blocks.GridCollections {...props} />
       },
       GridServiceCards: {
-        fields: { title: { type: "text" }, description: { type: "textarea" }, items: { type: "array", arrayFields: { title: { type: "text" }, description: { type: "text" }, image: { type: "text" } } } },
-        defaultProps: { title: "Services", description: "What we offer." },
+        fields: { title: { type: "text" }, description: { type: "textarea" }, dataSource: { 
+            type: "select",
+            options: [
+              { label: "Manual (static items)", value: "manual" },
+              { label: "Inventory (live products)", value: "inventory" }
+            ]
+          }, items: { type: "array", arrayFields: { title: { type: "text" }, description: { type: "text" }, image: { type: "text" } } } },
+        defaultProps: { title: "Services", description: "What we offer.", dataSource: "manual" },
         render: (props: any) => <Blocks.GridServiceCards {...props} />
       },
       GridPackages: {
         fields: { 
           title: { type: "text" },
+          dataSource: { 
+            type: "select",
+            options: [
+              { label: "Manual (static items)", value: "manual" },
+              { label: "Inventory (live products)", value: "inventory" }
+            ]
+          },
           items: {
             type: "array",
             arrayFields: {
@@ -207,6 +196,7 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
         },
         defaultProps: { 
           title: "Pricing & Packages",
+          dataSource: "manual",
           items: [
             { name: "Basic", price: "$99", ctaText: "Select Basic", features: [{ label: "Feature 1" }, { label: "Feature 2" }] },
             { name: "Pro", price: "$199", ctaText: "Select Pro", features: [{ label: "Feature 1" }, { label: "Feature 2" }, { label: "Feature 3" }] },

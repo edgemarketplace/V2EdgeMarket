@@ -1,299 +1,220 @@
-import React, { useState } from 'react';
-import { useForm, useFieldArray } from "react-hook-form";
-import { motion, AnimatePresence } from "motion/react";
-import { 
-  Plus, 
-  Trash2, 
-  Upload, 
-  FileText, 
-  List, 
-  FileJson,
-  ArrowRight,
-  ArrowLeft,
-  Check
-} from 'lucide-react';
-import { MarketplaceIntakeData, TemplateFamily, CommerceMode, InventoryItem } from "../lib/types";
+import React, { useMemo, useState } from 'react';
+import { ArrowRight, BrushCleaning, Mail, Palette, Phone, Store } from 'lucide-react';
+import { MarketplaceIntakeData, TemplateFamily } from '../lib/types';
+import { TEMPLATE_EXAMPLES } from '../lib/templateCatalog';
 
-export function Onboarding({ onComplete }: { onComplete: (data: MarketplaceIntakeData) => void }) {
-  const [step, setStep] = useState<1 | 2>(1);
-  const { register, handleSubmit, control, watch, setValue, trigger, formState: { errors } } = useForm<MarketplaceIntakeData>({
-    defaultValues: {
-      businessType: 'retail-core',
-      primaryGoal: 'checkout',
+interface OnboardingProps {
+  onComplete: (data: MarketplaceIntakeData) => void;
+}
+
+const templates = Object.entries(TEMPLATE_EXAMPLES) as Array<[
+  TemplateFamily,
+  (typeof TEMPLATE_EXAMPLES)[TemplateFamily],
+]>;
+
+export function Onboarding({ onComplete }: OnboardingProps) {
+  const queryTemplate = useMemo(() => {
+    if (typeof window === 'undefined') return 'retail-core' as TemplateFamily;
+    const value = new URLSearchParams(window.location.search).get('template') as TemplateFamily | null;
+    return value && TEMPLATE_EXAMPLES[value] ? value : 'retail-core';
+  }, []);
+
+  const [form, setForm] = useState<MarketplaceIntakeData>({
+    businessName: '',
+    businessType: queryTemplate,
+    offerings: '',
+    primaryGoal: TEMPLATE_EXAMPLES[queryTemplate].intake.primaryGoal,
+    contactEmail: '',
+    contactPhone: '',
+    serviceArea: '',
+    tone: '',
+    brandColor: TEMPLATE_EXAMPLES[queryTemplate].intake.brandColor,
+  });
+
+  const activeTemplate = TEMPLATE_EXAMPLES[form.businessType];
+
+  function update<K extends keyof MarketplaceIntakeData>(key: K, value: MarketplaceIntakeData[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    onComplete({
+      ...form,
+      contactEmail: form.contactEmail || 'hello@example.com',
       inventory: {
-        method: 'text',
-        items: [{ name: '', price: 0, description: '' }]
-      }
-    }
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "inventory.items"
-  });
-
-  const inventoryMethod = watch('inventory.method');
-
-  const onSubmit = (data: MarketplaceIntakeData) => {
-    onComplete(data);
-  };
-
-  const nextStep = async () => {
-    const isValid = await trigger(['businessName', 'businessType', 'offerings', 'primaryGoal', 'contactEmail']);
-    if (isValid) {
-      setStep(2);
-    }
-  };
-  const prevStep = () => setStep(1);
+        method: 'manual',
+        items: [],
+      },
+    });
+  }
 
   return (
-    <div className="min-h-screen bg-[#F9F8F6] text-[#1A1A1A] font-sans py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center p-4 border-8 border-white box-border overflow-x-hidden">
-      <div className="max-w-2xl w-full bg-white p-10 border border-black/10 shadow-xl relative">
-        
-        {/* Progress Bar */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-black/5">
-          <motion.div 
-            initial={{ width: "50%" }}
-            animate={{ width: step === 1 ? "50%" : "100%" }}
-            className="h-full bg-black"
-          />
-        </div>
+    <div className="min-h-screen bg-[#F9F8F6] text-[#1A1A1A] px-6 py-10 md:px-10">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8">
+        <div className="bg-white border border-black/5 rounded-[32px] p-8 md:p-12 shadow-sm">
+          <p className="text-[11px] uppercase tracking-[0.3em] font-bold text-black/30 mb-6">Step 1 of 3</p>
+          <h1 className="text-4xl md:text-6xl font-serif italic tracking-tight mb-6">Set the direction for your storefront.</h1>
+          <p className="text-black/60 max-w-2xl mb-10">
+            We will generate your editable site first, then route you into a dedicated inventory workspace before launch.
+          </p>
 
-        <div className="mb-12 flex justify-between items-end border-b border-black/5 pb-8">
-          <div>
-            <h2 className="text-4xl font-serif italic tracking-tight leading-none mb-2">
-              {step === 1 ? "Business Identity" : "Inventory Intake"}
-            </h2>
-            <p className="text-[10px] uppercase tracking-[0.3em] font-bold text-black/30">Step {step} of 2</p>
-          </div>
-          <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center text-white font-serif italic text-2xl">E</div>
-        </div>
-
-        <AnimatePresence mode="wait">
-          {step === 1 ? (
-            <motion.div
-              key="step1"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-6"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Business Name *</label>
-                  <input 
-                    {...register("businessName", { required: "Business name is required" })}
-                    className={`block w-full border-b ${errors.businessName ? 'border-red-500' : 'border-black/10'} bg-transparent py-4 focus:outline-none focus:border-black text-lg transition-colors italic font-serif`}
-                    placeholder="e.g. Bella's Blooms"
-                  />
-                  {errors.businessName && <span className="text-[10px] text-red-500 mt-1 block">{errors.businessName.message}</span>}
-                </div>
-
-                <div>
-                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Category *</label>
-                  <select 
-                    {...register("businessType", { required: "Category is required" })}
-                    className={`block w-full border-b ${errors.businessType ? 'border-red-500' : 'border-black/10'} bg-transparent py-4 focus:outline-none focus:border-black text-sm transition-colors cursor-pointer appearance-none`}
-                  >
-                    <option value="retail-core">Retail Core (Boutiques, shops)</option>
-                    <option value="service-pro">Service Pro (Consultants, skilled trade)</option>
-                    <option value="food-catering">Food & Catering (Restaurants, trucks)</option>
-                    <option value="artisan-market">Artisan Market (Handmade, local)</option>
-                    <option value="event-floral">Event & Floral (Florists, planners)</option>
-                  </select>
-                  {errors.businessType && <span className="text-[10px] text-red-500 mt-1 block">{errors.businessType.message}</span>}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">The Elevator Pitch *</label>
-                <textarea 
-                   {...register("offerings", { required: "Please describe your offerings" })}
-                   rows={3}
-                   className={`block w-full border ${errors.offerings ? 'border-red-500' : 'border-black/10'} bg-black/[0.02] p-4 focus:outline-none focus:border-black text-sm transition-colors resize-none`}
-                   placeholder="Describe what makes your products or services unique..."
+          <form onSubmit={submit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-[11px] uppercase tracking-[0.2em] font-bold text-black/40 mb-2 block">Business name</span>
+                <input
+                  value={form.businessName}
+                  onChange={(e) => update('businessName', e.target.value)}
+                  required
+                  className="w-full border border-black/10 rounded-2xl px-4 py-4 bg-white"
+                  placeholder="Bella Blooms"
                 />
-                {errors.offerings && <span className="text-[10px] text-red-500 mt-1 block">{errors.offerings.message}</span>}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Primary Goal *</label>
-                  <select 
-                    {...register("primaryGoal", { required: "Primary goal is required" })}
-                    className={`block w-full border-b ${errors.primaryGoal ? 'border-red-500' : 'border-black/10'} bg-transparent py-4 focus:outline-none focus:border-black text-sm transition-colors cursor-pointer appearance-none`}
-                  >
-                     <option value="checkout">Direct Checkout (E-commerce)</option>
-                     <option value="catalog">Display Catalog (Lead Gen)</option>
-                     <option value="quote">Request a Quote</option>
-                     <option value="booking">Book Appointments</option>
-                  </select>
-                  {errors.primaryGoal && <span className="text-[10px] text-red-500 mt-1 block">{errors.primaryGoal.message}</span>}
-                </div>
-                <div>
-                  <label className="block text-[10px] uppercase font-bold tracking-widest mb-2 text-black/50">Contact Email *</label>
-                  <input 
-                    {...register("contactEmail", { 
-                      required: "Email is required",
-                      pattern: { value: /^\S+@\S+$/i, message: "Invalid email format" }
-                    })}
+              </label>
+              <label className="block">
+                <span className="text-[11px] uppercase tracking-[0.2em] font-bold text-black/40 mb-2 block">Contact email</span>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-black/30" />
+                  <input
                     type="email"
-                    className={`block w-full border-b ${errors.contactEmail ? 'border-red-500' : 'border-black/10'} bg-transparent py-4 focus:outline-none focus:border-black text-sm transition-colors`}
-                    placeholder="hi@brand.com"
+                    value={form.contactEmail}
+                    onChange={(e) => update('contactEmail', e.target.value)}
+                    className="w-full border border-black/10 rounded-2xl pl-11 pr-4 py-4 bg-white"
+                    placeholder="hello@yourbrand.com"
                   />
-                  {errors.contactEmail && <span className="text-[10px] text-red-500 mt-1 block">{errors.contactEmail.message}</span>}
                 </div>
-              </div>
+              </label>
+            </div>
 
-              <div className="pt-8">
-                <button 
-                  type="button"
-                  onClick={nextStep}
-                  className="w-full flex justify-between items-center py-5 px-8 border border-black text-[10px] uppercase font-bold tracking-[0.2em] text-white bg-black hover:bg-black/90 transition-all group"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-[11px] uppercase tracking-[0.2em] font-bold text-black/40 mb-2 block">Template family</span>
+                <select
+                  value={form.businessType}
+                  onChange={(e) => {
+                    const template = e.target.value as TemplateFamily;
+                    update('businessType', template);
+                    update('primaryGoal', TEMPLATE_EXAMPLES[template].intake.primaryGoal);
+                    update('brandColor', TEMPLATE_EXAMPLES[template].intake.brandColor);
+                  }}
+                  className="w-full border border-black/10 rounded-2xl px-4 py-4 bg-white"
                 >
-                  Configure Inventory
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </button>
+                  {templates.map(([value, template]) => (
+                    <option key={value} value={value}>
+                      {template.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-[11px] uppercase tracking-[0.2em] font-bold text-black/40 mb-2 block">Primary goal</span>
+                <select
+                  value={form.primaryGoal}
+                  onChange={(e) => update('primaryGoal', e.target.value as MarketplaceIntakeData['primaryGoal'])}
+                  className="w-full border border-black/10 rounded-2xl px-4 py-4 bg-white"
+                >
+                  <option value="checkout">Sell directly</option>
+                  <option value="catalog">Show a catalog</option>
+                  <option value="quote">Capture quote requests</option>
+                  <option value="booking">Book appointments</option>
+                  <option value="digital">Deliver digital products</option>
+                </select>
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-[0.2em] font-bold text-black/40 mb-2 block">What are you selling?</span>
+              <textarea
+                value={form.offerings}
+                onChange={(e) => update('offerings', e.target.value)}
+                required
+                rows={5}
+                className="w-full border border-black/10 rounded-3xl px-4 py-4 bg-white"
+                placeholder="Luxury floral arrangements for weddings, events, and gifting across Nashville."
+              />
+            </label>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="block">
+                <span className="text-[11px] uppercase tracking-[0.2em] font-bold text-black/40 mb-2 block">Phone</span>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-black/30" />
+                  <input
+                    value={form.contactPhone || ''}
+                    onChange={(e) => update('contactPhone', e.target.value)}
+                    className="w-full border border-black/10 rounded-2xl pl-11 pr-4 py-4 bg-white"
+                    placeholder="Optional"
+                  />
+                </div>
+              </label>
+              <label className="block">
+                <span className="text-[11px] uppercase tracking-[0.2em] font-bold text-black/40 mb-2 block">Service area</span>
+                <div className="relative">
+                  <Store className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-black/30" />
+                  <input
+                    value={form.serviceArea || ''}
+                    onChange={(e) => update('serviceArea', e.target.value)}
+                    className="w-full border border-black/10 rounded-2xl pl-11 pr-4 py-4 bg-white"
+                    placeholder="Nashville"
+                  />
+                </div>
+              </label>
+              <label className="block">
+                <span className="text-[11px] uppercase tracking-[0.2em] font-bold text-black/40 mb-2 block">Brand color</span>
+                <div className="relative">
+                  <Palette className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-black/30" />
+                  <input
+                    value={form.brandColor || ''}
+                    onChange={(e) => update('brandColor', e.target.value)}
+                    className="w-full border border-black/10 rounded-2xl pl-11 pr-4 py-4 bg-white"
+                    placeholder="#1A1A1A"
+                  />
+                </div>
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-[0.2em] font-bold text-black/40 mb-2 block">Tone or creative direction</span>
+              <div className="relative">
+                <BrushCleaning className="w-4 h-4 absolute left-4 top-5 text-black/30" />
+                <textarea
+                  value={form.tone || ''}
+                  onChange={(e) => update('tone', e.target.value)}
+                  rows={3}
+                  className="w-full border border-black/10 rounded-3xl pl-11 pr-4 py-4 bg-white"
+                  placeholder="Elegant, premium, romantic, highly visual"
+                />
               </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8"
+            </label>
+
+            <button
+              type="submit"
+              className="w-full md:w-auto bg-black text-white px-8 py-4 rounded-full font-bold inline-flex items-center gap-3 hover:scale-[1.02] transition-transform"
             >
-              {/* Method Selector */}
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'text', label: 'Quick Text', icon: FileText },
-                  { id: 'file', label: 'Upload CSV/Doc', icon: Upload },
-                  { id: 'manual', label: 'Line Items', icon: List },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setValue('inventory.method', m.id as any)}
-                    className={`flex flex-col items-center gap-3 p-4 border transition-all ${
-                      inventoryMethod === m.id 
-                        ? 'bg-black text-white border-black ring-1 ring-black' 
-                        : 'bg-transparent text-black/40 border-black/10 hover:border-black/30'
-                    }`}
-                  >
-                    <m.icon className="w-5 h-5" />
-                    <span className="text-[10px] uppercase font-bold tracking-widest">{m.label}</span>
-                  </button>
-                ))}
-              </div>
+              Generate editable storefront
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </form>
+        </div>
 
-              <div className="min-h-[300px]">
-                {inventoryMethod === 'text' && (
-                  <div className="space-y-4">
-                    <p className="text-xs text-black/50 italic">Paste a list of products, descriptions, or just raw notes. Our AI will structure it for your hub.</p>
-                    <textarea 
-                      {...register("inventory.content")}
-                      className="block w-full h-[250px] border border-black/10 bg-black/[0.02] p-6 focus:outline-none focus:border-black text-sm transition-colors font-mono"
-                      placeholder="Example:
-Handmade Blue Vase - $45 - Unique ceramic piece
-Organic Cotton Tote - $25 - Locally sourced..."
-                    />
-                  </div>
-                )}
-
-                {inventoryMethod === 'file' && (
-                  <div className="flex flex-col items-center justify-center h-[300px] border-2 border-dashed border-black/10 bg-black/[0.01] rounded-xl hover:bg-black/[0.03] transition-colors cursor-pointer group">
-                    <Upload className="w-10 h-10 text-black/20 group-hover:text-black transition-colors mb-4" />
-                    <p className="text-sm font-bold">Drop CSV, PDF, or Word Document</p>
-                    <p className="text-[10px] uppercase tracking-widest text-black/30 mt-2">Max file size 10MB</p>
-                    <input 
-                      type="file" 
-                      className="hidden" 
-                      accept=".csv,.pdf,.doc,.docx"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) setValue('inventory.fileName', file.name);
-                      }}
-                    />
-                    {watch('inventory.fileName') && (
-                      <div className="mt-4 flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold ring-1 ring-green-200">
-                        <Check className="w-3 h-3" />
-                        {watch('inventory.fileName')}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {inventoryMethod === 'manual' && (
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {fields.map((field, index) => (
-                      <div key={field.id} className="grid grid-cols-12 gap-4 items-start bg-black/[0.02] p-4 border border-black/5 rounded-lg group">
-                        <div className="col-span-6">
-                           <input 
-                             {...register(`inventory.items.${index}.name` as const)}
-                             placeholder="Product Name"
-                             className="w-full bg-transparent border-b border-black/5 py-2 font-bold focus:outline-none focus:border-black transition-colors"
-                           />
-                        </div>
-                        <div className="col-span-4">
-                           <input 
-                             {...register(`inventory.items.${index}.price` as const)}
-                             type="number"
-                             placeholder="Price"
-                             className="w-full bg-transparent border-b border-black/5 py-2 focus:outline-none focus:border-black transition-colors"
-                           />
-                        </div>
-                        <div className="col-span-2 flex justify-end">
-                           <button 
-                            type="button" 
-                            onClick={() => remove(index)}
-                            className="p-2 text-black/20 hover:text-red-500 transition-colors"
-                           >
-                             <Trash2 className="w-4 h-4" />
-                           </button>
-                        </div>
-                        <div className="col-span-12">
-                          <input 
-                             {...register(`inventory.items.${index}.description` as const)}
-                             placeholder="Brief description..."
-                             className="w-full bg-transparent border-b border-black/5 py-1 text-xs text-black/50 focus:outline-none focus:border-black transition-colors"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                    <button 
-                      type="button"
-                      onClick={() => append({ name: '', price: 0, description: '' })}
-                      className="w-full py-4 border border-dashed border-black/10 text-black/40 hover:text-black hover:border-black transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add Item
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-8 flex gap-4">
-                <button 
-                  type="button"
-                  onClick={prevStep}
-                  className="flex-1 flex justify-center items-center py-5 px-8 border border-black/10 text-[10px] uppercase font-bold tracking-[0.2em] text-black hover:bg-black/5 transition-all"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Details
-                </button>
-                <button 
-                  type="button"
-                  onClick={handleSubmit(onSubmit)}
-                  className="flex-[2] flex justify-center items-center py-5 px-8 border border-black text-[10px] uppercase font-bold tracking-[0.2em] text-white bg-black hover:bg-black/90 transition-all shadow-xl shadow-black/10"
-                >
-                  Build My Marketplace
-                  <Check className="w-4 h-4 ml-2" />
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <aside className="bg-[#1A1A1A] text-white rounded-[32px] p-8 md:p-10">
+          <p className="text-[11px] uppercase tracking-[0.3em] font-bold text-white/40 mb-4">Selected template</p>
+          <h2 className="text-3xl font-serif italic mb-4">{activeTemplate.label}</h2>
+          <p className="text-white/70 leading-relaxed mb-8">{activeTemplate.summary}</p>
+          <div className="rounded-[28px] bg-white/5 border border-white/10 p-6 mb-8">
+            <p className="text-[10px] uppercase tracking-[0.3em] font-bold text-white/40 mb-3">What happens next</p>
+            <ol className="space-y-4 text-sm text-white/80">
+              <li>1. We generate your editable storefront structure and copy.</li>
+              <li>2. You refine content in the editor, then move into a real inventory workspace.</li>
+              <li>3. Inventory sync powers your launch plan and optional Medusa routing.</li>
+            </ol>
+          </div>
+          <div className="rounded-[28px] bg-white text-black p-6">
+            <p className="text-[10px] uppercase tracking-[0.3em] font-bold text-black/30 mb-2">Recommended vibe</p>
+            <p className="font-bold mb-2">{activeTemplate.headline}</p>
+            <p className="text-sm text-black/60">{activeTemplate.kicker}</p>
+          </div>
+        </aside>
       </div>
     </div>
   );

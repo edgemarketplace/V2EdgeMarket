@@ -1,329 +1,186 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { 
-  Check, 
-  Zap, 
-  Rocket, 
-  Globe, 
-  ArrowLeft, 
-  CreditCard, 
-  ChevronRight,
-  Mail, 
-  MapPin, 
-  Tag, 
-  Target
-} from 'lucide-react';
-import { MarketplaceIntakeData } from '../lib/types';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import React, { useMemo, useState } from 'react';
+import { ArrowLeft, ArrowRight, Check, Globe, Rocket, Zap } from 'lucide-react';
+import { DeploymentRecord, InventoryItem, LaunchPlan, MarketplaceSiteDraft } from '../lib/types';
+import { buildSiteHeaders } from '../lib/siteDrafts';
 
-// Dummy test key for UI purposes
-const stripePromise = loadStripe('pk_test_TYooMQauvdEDq54NiTphI7jx');
-
-interface CheckoutPageProps {
-  intakeData: MarketplaceIntakeData;
+export function CheckoutPage({
+  draft,
+  onBack,
+  onComplete,
+}: {
+  draft: MarketplaceSiteDraft;
   onBack: () => void;
-  onComplete: (plan: 'launch' | 'pro') => void;
-}
+  onComplete: (plan: LaunchPlan, deployment: DeploymentRecord) => void;
+}) {
+  const [selectedPlan, setSelectedPlan] = useState<LaunchPlan>(draft.selectedPlan || 'launch');
+  const [ownerName, setOwnerName] = useState(draft.intakeData.businessName);
+  const [email, setEmail] = useState(draft.intakeData.contactEmail || '');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-const CheckoutForm = ({ plan, onComplete }: { plan: 'launch' | 'pro', onComplete: (plan: 'launch' | 'pro') => void }) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const inventorySummary = useMemo(() => {
+    const total = draft.inventoryItems.length;
+    const categories = new Set(draft.inventoryItems.map((item: InventoryItem) => item.category).filter(Boolean));
+    return `${total} item${total === 1 ? '' : 's'}${categories.size ? ` / ${categories.size} categor${categories.size === 1 ? 'y' : 'ies'}` : ''}`;
+  }, [draft.inventoryItems]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-    setIsProcessing(true);
-    // Simulate network delay for payment processing
-    setTimeout(() => {
-      setIsProcessing(false);
-      onComplete(plan);
-    }, 1500);
-  };
+  async function launch() {
+    setSubmitting(true);
+    setError('');
+
+    const existingDeployment = draft.deployment;
+    const shouldRetry = existingDeployment?.status === 'failed';
+    const idempotencyKey = shouldRetry || !existingDeployment?.idempotencyKey
+      ? `${draft.siteId}:${selectedPlan}:attempt-${(existingDeployment?.attemptCount || 0) + 1}`
+      : existingDeployment.idempotencyKey;
+
+    try {
+      await fetch(`/api/sites/${draft.siteId}/checkout-intents`, {
+        method: 'POST',
+        headers: buildSiteHeaders(draft),
+        body: JSON.stringify({
+          customerName: ownerName,
+          email,
+          notes,
+          productInterest: draft.intakeData.offerings,
+        }),
+      });
+
+      const response = await fetch(`/api/sites/${draft.siteId}/deploy`, {
+        method: 'POST',
+        headers: {
+          ...buildSiteHeaders(draft),
+          'x-idempotency-key': idempotencyKey,
+        },
+        body: JSON.stringify({
+          siteId: draft.siteId,
+          selectedPlan,
+          ownerName,
+          email,
+          notes,
+          idempotencyKey,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const deployment = await response.json();
+      onComplete(selectedPlan, deployment);
+    } catch (launchError) {
+      console.error(launchError);
+      setError(launchError instanceof Error ? launchError.message : String(launchError));
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 w-full">
-      <div className="p-4 border border-black/10 rounded-xl bg-white shadow-sm mt-4">
-        <CardElement options={{
-          style: {
-            base: {
-              fontSize: '16px',
-              color: '#1A1A1A',
-              '::placeholder': { color: '#aab7c4' },
-              fontFamily: 'Inter, sans-serif'
-            },
-            invalid: { color: '#9e2146' },
-          },
-        }} />
-      </div>
-      <button 
-        type="submit"
-        disabled={!stripe || isProcessing}
-        className="w-full bg-black text-white p-6 rounded-2xl font-bold flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-black/10 group disabled:opacity-50 disabled:scale-100"
-      >
-        {isProcessing ? (
-          <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-        ) : (
-          <CreditCard className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-        )}
-        {isProcessing ? 'Processing Payment...' : (plan === 'launch' ? 'Pay $5 Activation & Launch' : 'Start Subscription & Launch')}
-        {!isProcessing && <ChevronRight className="w-5 h-5 opacity-30" />}
-      </button>
-      <p className="text-center text-[10px] text-black/30 mt-6 font-medium italic">
-        {plan === 'launch' 
-          ? '*Activation fee is refunded after your first successful sale.' 
-          : 'Subscription starts immediately. Billed monthly. Cancel anytime.'}
-      </p>
-    </form>
-  );
-};
+    <div className="min-h-screen bg-[#F9F8F6] text-[#1A1A1A] px-6 py-8 md:px-10">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-8">
+        <main className="bg-white border border-black/5 rounded-[32px] p-8 md:p-10">
+          <p className="text-[11px] uppercase tracking-[0.3em] font-bold text-black/35 mb-4">Step 3 of 3</p>
+          <h1 className="text-4xl md:text-6xl font-serif italic tracking-tight mb-4">Launch with a real status, not a fake success screen.</h1>
+          <p className="text-black/60 leading-relaxed mb-10">
+            This step records the launch request, keeps your selected plan, checks inventory readiness, and attempts a Medusa sync for commerce-oriented storefronts when credentials are available.
+          </p>
 
-export const CheckoutPage: React.FC<CheckoutPageProps> = ({ intakeData, onBack, onComplete }) => {
-  const [selectedPlan, setSelectedPlan] = useState<'launch' | 'pro'>('launch');
-
-  return (
-    <div className="min-h-screen bg-[#F9F8F6] text-[#1A1A1A] font-sans selection:bg-black selection:text-white pb-20">
-      {/* Header */}
-      <header className="border-b border-black/5 bg-white py-6 px-8 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <button 
-            onClick={onBack}
-            className="flex items-center gap-2 text-sm font-bold opacity-40 hover:opacity-100 transition-opacity"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Editor
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-black rounded-sm flex items-center justify-center font-serif italic font-bold text-white text-sm">E</div>
-            <span className="font-bold tracking-tight text-sm">Edge Marketplace Hub</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <button
+              onClick={() => setSelectedPlan('launch')}
+              className={`text-left rounded-[28px] border p-6 transition-all ${selectedPlan === 'launch' ? 'border-black bg-white shadow-sm' : 'border-black/10 bg-[#F9F8F6]'}`}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <Rocket className="w-5 h-5" />
+                <span className="font-bold uppercase tracking-[0.2em] text-xs">Launch</span>
+              </div>
+              <p className="text-4xl font-serif italic mb-3">$0/mo</p>
+              <p className="text-sm text-black/60">Edge subdomain, launch queue, 5% marketplace fee, and verified inventory handoff.</p>
+            </button>
+            <button
+              onClick={() => setSelectedPlan('pro')}
+              className={`text-left rounded-[28px] border p-6 transition-all ${selectedPlan === 'pro' ? 'border-black bg-[#1A1A1A] text-white shadow-sm' : 'border-black/10 bg-white'}`}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <Zap className="w-5 h-5" />
+                <span className="font-bold uppercase tracking-[0.2em] text-xs">Pro</span>
+              </div>
+              <p className="text-4xl font-serif italic mb-3">$99/mo</p>
+              <p className={`${selectedPlan === 'pro' ? 'text-white/70' : 'text-black/60'} text-sm`}>
+                Priority launch path, custom-domain readiness, and the same inventory pipeline with optional Medusa sync.
+              </p>
+            </button>
           </div>
-          <div className="w-24"></div> {/* Spacer for balance */}
-        </div>
-      </header>
 
-      <main className="max-w-screen-2xl mx-auto px-8 pt-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
-          
-          {/* Left Side: Business Review */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-12"
-          >
-            <div>
-              <h2 className="text-4xl font-serif italic mb-2">Review Your Business</h2>
-              <p className="text-black/50">Your marketplace is ready. Here's a summary of the configuration we're deploying to the edge.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <input
+              value={ownerName}
+              onChange={(e) => setOwnerName(e.target.value)}
+              className="border border-black/10 rounded-2xl px-4 py-4"
+              placeholder="Owner or operator name"
+            />
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="border border-black/10 rounded-2xl px-4 py-4"
+              placeholder="Launch contact email"
+              type="email"
+            />
+          </div>
+
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={5}
+            className="w-full border border-black/10 rounded-[28px] px-4 py-4 mb-8"
+            placeholder="Optional launch notes, domain requirements, catalog caveats, or launch timing."
+          />
+
+          {error && <p className="text-red-600 text-sm mb-6">{error}</p>}
+
+          <div className="flex flex-wrap justify-between gap-4">
+            <button onClick={onBack} className="px-6 py-4 rounded-full border border-black/10 font-bold inline-flex items-center gap-3 bg-[#F9F8F6]">
+              <ArrowLeft className="w-4 h-4" />
+              Back to inventory
+            </button>
+            <button onClick={launch} disabled={submitting || !draft.inventoryItems.length} className="px-6 py-4 rounded-full bg-black text-white font-bold inline-flex items-center gap-3 disabled:opacity-40">
+              {submitting ? 'Submitting launch…' : 'Request launch'}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </main>
+
+        <aside className="space-y-6">
+          <div className="bg-white border border-black/5 rounded-[32px] p-6">
+            <p className="text-[10px] uppercase tracking-[0.3em] font-bold text-black/35 mb-3">Ready state</p>
+            <h2 className="text-2xl font-serif italic mb-4">{draft.intakeData.businessName}</h2>
+            <div className="space-y-3 text-sm text-black/65">
+              <p><strong>Template:</strong> {draft.templateFamily}</p>
+              <p><strong>Commerce goal:</strong> {draft.intakeData.primaryGoal}</p>
+              <p><strong>Inventory:</strong> {inventorySummary}</p>
             </div>
+          </div>
 
-            <div className="bg-white border border-black/5 rounded-3xl overflow-hidden shadow-sm">
-              <div className="p-8 border-b border-black/5 bg-black/[0.02]">
-                <div className="flex items-center gap-4 mb-2">
-                  <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center text-white font-serif italic text-2xl">
-                    {intakeData.businessName.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-xl">{intakeData.businessName}</h3>
-                    <p className="text-xs uppercase tracking-widest text-black/40 font-bold">{intakeData.businessType.replace('-', ' ')}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-8 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-black/30 flex items-center gap-2">
-                      <Mail className="w-3 h-3" /> Contact Email
-                    </p>
-                    <p className="font-medium">{intakeData.contactEmail}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-black/30 flex items-center gap-2">
-                      <MapPin className="w-3 h-3" /> Service Area
-                    </p>
-                    <p className="font-medium">{intakeData.serviceArea || 'Global'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-black/30 flex items-center gap-2">
-                      <Tag className="w-3 h-3" /> Primary Offerings
-                    </p>
-                    <p className="font-medium line-clamp-1">{intakeData.offerings}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-black/30 flex items-center gap-2">
-                      <Target className="w-3 h-3" /> Growth Goal
-                    </p>
-                    <p className="font-medium capitalize">{intakeData.primaryGoal}</p>
-                  </div>
-                </div>
-
-                <div className="pt-8 border-t border-black/5">
-                   <p className="text-[10px] font-bold uppercase tracking-widest text-black/30 mb-4">Instance Configuration</p>
-                   <div className="space-y-3">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-black/50">Edge Nodes</span>
-                        <span className="font-bold">42 Active</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-black/50">Database Tier</span>
-                        <span className="font-bold">Encrypted Cluster</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-black/50">SSL Certificate</span>
-                        <span className="font-bold text-green-600">Provisioned</span>
-                      </div>
-                   </div>
-                </div>
-              </div>
+          <div className="bg-[#1A1A1A] text-white rounded-[32px] p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Globe className="w-5 h-5" />
+              <h2 className="text-2xl font-serif italic">What launch does now</h2>
             </div>
-
-            <div className="p-8 bg-black/[0.03] rounded-2xl border border-black/5 flex gap-4">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-black/5 shadow-sm text-black/40">
-                <Globe className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm mb-1">Global Deployment Ready</h4>
-                <p className="text-xs text-black/50 leading-relaxed">Once you complete the checkout, your business will be live on <code>{intakeData.businessName.toLowerCase().replace(/\s+/g, '-')}.edgemarketplacehub.com</code> within seconds.</p>
-              </div>
+            <ul className="space-y-3 text-sm text-white/75">
+              <li>• Records the launch request and selected plan.</li>
+              <li>• Checks whether inventory actually exists.</li>
+              <li>• Attempts Medusa sync when commerce credentials are configured.</li>
+              <li>• Produces a status page with real readiness signals.</li>
+            </ul>
+            <div className="mt-6 pt-6 border-t border-white/10 text-xs text-white/50">
+              <div className="flex items-center gap-2 mb-2"><Check className="w-3 h-3" /> No fake Stripe card collection</div>
+              <div className="flex items-center gap-2"><Check className="w-3 h-3" /> No pretend published URL until launch state is ready</div>
             </div>
-          </motion.div>
-
-          {/* Right Side: Plan Selection */}
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-12"
-          >
-            <div>
-              <h2 className="text-4xl font-serif italic mb-2">Choose Your Scale</h2>
-              <p className="text-black/50">Transparent pricing for the next generation of commerce.</p>
-            </div>
-
-            <div className="space-y-6">
-              {/* Launch Plan */}
-              <div 
-                onClick={() => setSelectedPlan('launch')}
-                className={`group cursor-pointer p-8 rounded-3xl border transition-all ${
-                  selectedPlan === 'launch' 
-                    ? 'bg-white border-black shadow-xl ring-1 ring-black' 
-                    : 'bg-white/50 border-black/10 hover:border-black/30 shadow-sm'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-8">
-                  <div>
-                    <h3 className="text-sm font-bold uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                       <Rocket className={`w-4 h-4 ${selectedPlan === 'launch' ? 'text-black' : 'text-black/30'}`} /> 
-                       Launch
-                    </h3>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-serif italic font-bold">$0</span>
-                      <span className="text-black/30 font-medium">/mo</span>
-                    </div>
-                  </div>
-                  {selectedPlan === 'launch' && (
-                    <div className="w-6 h-6 bg-black rounded-full flex items-center justify-center">
-                      <Check className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-black/30">Fees</p>
-                    <p className="text-sm font-bold">5% per sale</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-black/30">Branding</p>
-                    <p className="text-sm font-bold">Edge Subdomain</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-black/30">Go Live</p>
-                    <p className="text-sm font-bold">$5 activation*</p>
-                  </div>
-                  <div className="space-y-1">
-                     <p className="text-[10px] font-bold uppercase tracking-widest text-black/30">Support</p>
-                     <p className="text-sm font-bold">Community</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pro Plan */}
-              <div 
-                onClick={() => setSelectedPlan('pro')}
-                className={`group cursor-pointer p-8 rounded-3xl border transition-all relative overflow-hidden ${
-                  selectedPlan === 'pro' 
-                    ? 'bg-[#1A1A1A] text-white border-white shadow-xl ring-1 ring-white' 
-                    : 'bg-[#1A1A1A]/90 text-white/40 border-white/10 hover:border-white/30 shadow-sm'
-                }`}
-              >
-                {selectedPlan === 'pro' && (
-                  <div className="absolute top-0 right-0 p-4">
-                    <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
-                      <Check className="w-4 h-4 text-black" />
-                    </div>
-                  </div>
-                )}
-                <div className="mb-8">
-                  <h3 className={`text-sm font-bold uppercase tracking-[0.2em] mb-4 flex items-center gap-2 ${selectedPlan === 'pro' ? 'text-white/60' : 'text-white/20'}`}>
-                     <Zap className={`w-4 h-4 ${selectedPlan === 'pro' ? 'text-white fill-white' : 'text-white/20'}`} /> 
-                     Pro
-                  </h3>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-serif italic font-bold text-white">$99</span>
-                    <span className="text-white/30 font-medium">/mo</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-                  <div className="space-y-1">
-                    <p className={`text-[10px] font-bold uppercase tracking-widest ${selectedPlan === 'pro' ? 'text-white/30' : 'text-white/10'}`}>Fees</p>
-                    <p className={`text-sm font-bold ${selectedPlan === 'pro' ? 'text-white' : ''}`}>1% per sale</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className={`text-[10px] font-bold uppercase tracking-widest ${selectedPlan === 'pro' ? 'text-white/30' : 'text-white/10'}`}>Branding</p>
-                    <p className={`text-sm font-bold ${selectedPlan === 'pro' ? 'text-white' : ''}`}>Custom Domain</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className={`text-[10px] font-bold uppercase tracking-widest ${selectedPlan === 'pro' ? 'text-white/30' : 'text-white/10'}`}>Go Live</p>
-                    <p className={`text-sm font-bold ${selectedPlan === 'pro' ? 'text-white' : ''}`}>Instant Live</p>
-                  </div>
-                  <div className="space-y-1">
-                     <p className={`text-[10px] font-bold uppercase tracking-widest ${selectedPlan === 'pro' ? 'text-white/30' : 'text-white/10'}`}>Support</p>
-                     <p className={`text-sm font-bold ${selectedPlan === 'pro' ? 'text-white' : ''}`}>Priority 24/7</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-8 border-t border-black/5">
-              <Elements stripe={stripePromise}>
-                <CheckoutForm plan={selectedPlan} onComplete={onComplete} />
-              </Elements>
-            </div>
-
-            {/* Core Features Recap */}
-            <div className="bg-white border border-black/5 p-8 rounded-2xl mt-8">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-black/30 mb-6 text-center italic">Included in both tiers</p>
-              <div className="grid grid-cols-2 gap-4">
-                 {[
-                   "Marketplace Templates",
-                   "Unlimited Products",
-                   "Global Edge Hosting",
-                   "Built-in Checkout",
-                   "Sales Dashboard",
-                   "Automated SSL"
-                 ].map((f, i) => (
-                   <div key={i} className="flex items-center gap-2 text-[11px] font-bold">
-                     <Check className="w-3 h-3 text-green-500" />
-                     {f}
-                   </div>
-                 ))}
-              </div>
-            </div>
-
-          </motion.div>
-        </div>
-      </main>
+          </div>
+        </aside>
+      </div>
     </div>
   );
-};
+}

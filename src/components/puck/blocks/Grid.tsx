@@ -1,10 +1,15 @@
 import React from 'react';
 
-export const GridFeaturedProducts = ({ title, items }: { title: string, items?: { name: string, price: string, category: string, image?: string }[] }) => {
+export const GridFeaturedProducts = ({ title, items, dataSource }: { title: string, items?: { name: string, price: string, category: string, image?: string }[], dataSource?: string }) => {
   const defaultItems = [1, 2, 3, 4].map(i => ({ name: `Item Name ${i}`, price: "$99", category: "Category Name", image: "" }));
   const products = items || defaultItems;
   return (
-    <div className="py-24 px-10 bg-white border-b border-black/10">
+    <div className="py-24 px-10 bg-white border-b border-black/10 relative">
+      {dataSource === 'inventory' && (
+        <div className="absolute top-4 right-4 bg-blue-500 text-white text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded">
+          Inventory-bound
+        </div>
+      )}
       <div className="max-w-6xl mx-auto">
         <h2 className="text-4xl font-serif italic mb-12 text-center text-[#1A1A1A]">{title}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
@@ -30,10 +35,15 @@ export const GridFeaturedProducts = ({ title, items }: { title: string, items?: 
   );
 };
 
-export const GridCollections = ({ title, items }: { title: string, items?: { title: string, image?: string }[] }) => {
+export const GridCollections = ({ title, items, dataSource }: { title: string, items?: { title: string, image?: string }[], dataSource?: string }) => {
   const collections = items || [1, 2].map(i => ({ title: `Collection ${i}`, image: "" }));
   return (
-    <div className="py-20 px-10 bg-[#F9F8F6] border-b border-black/10">
+    <div className="py-20 px-10 bg-[#F9F8F6] border-b border-black/10 relative">
+      {dataSource === 'inventory' && (
+        <div className="absolute top-4 right-4 bg-blue-500 text-white text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded">
+          Inventory-bound
+        </div>
+      )}
       <div className="max-w-6xl mx-auto">
         <h2 className="text-4xl font-serif italic mb-12 text-[#1A1A1A]">{title}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -50,8 +60,13 @@ export const GridCollections = ({ title, items }: { title: string, items?: { tit
   );
 };
 
-export const GridServiceCards = ({ title, description, items }: { title: string, description: string, items?: { title: string, description: string, image?: string }[] }) => (
-  <div className="py-20 px-10 border-b border-black/10 bg-[#F9F8F6]">
+export const GridServiceCards = ({ title, description, items, dataSource }: { title: string, description: string, items?: { title: string, description: string, image?: string }[], dataSource?: string }) => (
+  <div className="py-20 px-10 border-b border-black/10 bg-[#F9F8F6] relative">
+    {dataSource === 'inventory' && (
+      <div className="absolute top-4 right-4 bg-blue-500 text-white text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded">
+        Inventory-bound
+      </div>
+    )}
     <div className="max-w-6xl mx-auto">
       <div className="mb-16 md:flex md:items-end md:justify-between">
         <div className="max-w-2xl">
@@ -78,7 +93,7 @@ export const GridServiceCards = ({ title, description, items }: { title: string,
   </div>
 );
 
-export const GridPackages = ({ title, items }: { title: string, items?: { name: string, price: string, features: { label: string }[], ctaText?: string }[] }) => {
+export const GridPackages = ({ title, items, dataSource }: { title: string, items?: { name: string, price: string, features: { label: string }[], ctaText?: string }[], dataSource?: string }) => {
   const defaultItems = [
     { name: 'Basic', price: '$99', ctaText: 'Select Basic', features: [{ label: 'Feature 1' }, { label: 'Feature 2' }] },
     { name: 'Pro', price: '$199', ctaText: 'Select Pro', features: [{ label: 'Feature 1' }, { label: 'Feature 2' }, { label: 'Feature 3' }] },
@@ -88,7 +103,12 @@ export const GridPackages = ({ title, items }: { title: string, items?: { name: 
   const packages = items || defaultItems;
 
   return (
-    <div className="py-24 px-10 bg-white border-b border-black/10">
+    <div className="py-24 px-10 bg-white border-b border-black/10 relative">
+      {dataSource === 'inventory' && (
+        <div className="absolute top-4 right-4 bg-blue-500 text-white text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded">
+          Inventory-bound
+        </div>
+      )}
       <div className="max-w-5xl mx-auto">
         <h2 className="text-4xl font-serif italic mb-16 text-center text-[#1A1A1A]">{title}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

@@ -1,164 +1,239 @@
-import { Router } from "express";
-import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
-import { db } from "../../src/db";
-import { sql } from "drizzle-orm";
+import crypto from 'node:crypto';
+import { Router } from 'express';
+import { generatePageManifest } from '../../src/server/generatePageManifest';
+import {
+  applyDeploymentEventByDeploymentId,
+  createMarketplaceDraft,
+  getCapabilities,
+  getDeployment,
+  getInventory,
+  getMarketplaceDraftSnapshot,
+  reconcileDeployment,
+  replaceInventory,
+  requestDeployment,
+  saveCheckoutIntent,
+  saveLaunchPlan,
+  saveMarketplaceDraftSnapshot,
+  verifySiteAccess,
+} from '../../src/server/siteStore';
+import { InventoryItem, LaunchRequest, MarketplaceIntakeData, MarketplaceSiteDraft } from '../../src/lib/types';
 
 const router = Router();
 
-router.get("/health", async (req, res) => {
+function readSiteToken(req: any) {
+  const headerToken = req.headers['x-site-token'];
+  return typeof headerToken === 'string' ? headerToken : undefined;
+}
+
+function readIdempotencyKey(req: any, siteId: string, selectedPlan: string) {
+  const headerValue = req.headers['x-idempotency-key'];
+  if (typeof headerValue === 'string' && headerValue.trim()) return headerValue.trim();
+
+  const bodyValue = req.body?.idempotencyKey;
+  if (typeof bodyValue === 'string' && bodyValue.trim()) return bodyValue.trim();
+
+  return `${siteId}:${selectedPlan}:attempt-1`;
+}
+
+async function requireSiteAccess(req: any, res: any) {
+  const authorized = await verifySiteAccess(req.params.siteId, readSiteToken(req));
+  if (!authorized) {
+    res.status(403).json({ error: 'Forbidden: valid site token required.' });
+    return false;
+  }
+  return true;
+}
+
+function requireWebhookSecret(req: any, res: any) {
+  const expectedSecret = process.env.DEPLOYMENT_WEBHOOK_SECRET;
+  const suppliedSecret = req.headers['x-deployment-webhook-secret'];
+
+  if (!expectedSecret) {
+    res.status(503).json({ error: 'Deployment webhook secret is not configured.' });
+    return false;
+  }
+
+  if (typeof suppliedSecret !== 'string') {
+    res.status(403).json({ error: 'Forbidden: valid deployment webhook secret required.' });
+    return false;
+  }
+
+  const expectedBuffer = Buffer.from(expectedSecret);
+  const suppliedBuffer = Buffer.from(suppliedSecret);
+  if (expectedBuffer.length !== suppliedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, suppliedBuffer)) {
+    res.status(403).json({ error: 'Forbidden: valid deployment webhook secret required.' });
+    return false;
+  }
+
+  return true;
+}
+
+router.get('/health', async (_req, res) => {
+  res.json({ status: 'ok', capabilities: await getCapabilities() });
+});
+
+router.post('/sites', async (req, res) => {
   try {
-    await db.execute(sql`SELECT 1`);
-    res.json({ status: "ok", database: "connected" });
-  } catch (err) {
-    res.json({ status: "ok", database: "disconnected", error: String(err) });
+    const intake = req.body as MarketplaceIntakeData;
+    const draft = await createMarketplaceDraft(intake);
+    res.status(201).json(draft);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
-router.post("/generate-page", async (req, res) => {
+router.get('/sites/:siteId', async (req, res) => {
   try {
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    
-    if (!openaiApiKey && !geminiApiKey) {
-      return res.status(500).json({ error: "Neither OPENAI_API_KEY nor GEMINI_API_KEY is configured." });
+    if (!(await requireSiteAccess(req, res))) return;
+    const draft = await getMarketplaceDraftSnapshot(req.params.siteId);
+    if (!draft) {
+      res.status(404).json({ error: 'Draft not found.' });
+      return;
     }
-
-    const intake = req.body;
-    
-    let inventoryContext = "";
-    if (intake.inventory) {
-      if (intake.inventory.method === 'manual' && intake.inventory.items?.length > 0) {
-        inventoryContext = `The user provided the following inventory items:\n${JSON.stringify(intake.inventory.items, null, 2)}`;
-      } else if (intake.inventory.method === 'text' && intake.inventory.content) {
-        inventoryContext = `The user provided the following raw inventory text. Please parse this into structured products/packages:\n${intake.inventory.content}`;
-      } else if (intake.inventory.method === 'file') {
-        inventoryContext = `The user indicated they uploaded a file named ${intake.inventory.fileName}. Generate realistic placeholder products based on their business type.`;
-      }
-    }
-
-    const prompt = `**System Prompt: Edge Marketplace Hub — AI Web Designer**
-
-You are the Lead Product Architect and AI Web Designer for Edge Marketplace Hub. Your job is to convert a user's intake form into a fully configured, production-ready Puck Editor website manifest. 
-
-**Primary Goal:**
-Create an AI-assisted, constrained marketplace/site builder JSON configuration for a non-technical user. Go from the provided business intake variables to a polished, editable preview structure in one step.
-
-**Non-Goals:**
-- Do not build a generic, unrestricted page builder.
-- Do not expose raw HTML or arbitrary component nesting.
-- Do not invent components outside of the approved section inventory.
-
----
-
-### **USER INTAKE VARIABLES**
-*Read these variables and use them to construct the site's copy, layout, and configuration.*
-
-*   **Business Name:** ${intake.businessName}
-*   **Category (Template Family):** ${intake.businessType}
-*   **The Elevator Pitch:** ${intake.offerings}
-*   **Primary Goal (Commerce Mode):** ${intake.primaryGoal}
-*   **Contact Email:** ${intake.contactEmail}
-
-${inventoryContext ? `\n### **INVENTORY DATA**\n${inventoryContext}\n\n**CRITICAL INSTRUCTION**: You MUST use the inventory data above to populate the products, services, or packages in the 'GridFeaturedProducts', 'GridPackages', or 'GridServiceCards' components you generate. Do not use generic placeholders if inventory data is provided.` : ''}
-
----
-
-### **DESIGN & STYLING MATRIX**
-*Based on the User Intake Variables above, select the exact \`stylePreset\`, layout tone, and section blocks using this logic:*
-
-**1. Retail Core (Boutiques, shops)**
-*   **If Primary Goal is Direct Checkout:** Use the \`modern-commerce\` or \`boutique-luxury\` style preset.
-*   **Design Tone:** Minimal luxury, generous whitespace, strong editorial product framing. 
-*   **Required Sections:** PromoHeader, CommerceHeader, ProductHero, FeaturedCollection, ProductGrid, CommerceFooter.
-
-**2. Service Pro (Landscapers, cleaners, pet grooming)**
-*   **If Primary Goal is Booking or Quotes:** Use the \`professional-agency\` or \`service-first\` style preset.
-*   **Design Tone:** Trustworthy, functional, high-contrast CTA moments.
-*   **Required Sections:** ServiceHeader, ServiceHero/HeroBooking, BenefitStrip, ServiceCards/PricingTiers, BeforeAfter Gallery, BookingCTA, ServiceFooter.
-
-**3. Food & Catering (Food trucks, caterers)**
-*   **If Primary Goal is Direct Checkout or Booking:** Use the \`organic\` or \`boutique\` style preset.
-*   **Design Tone:** Warm, inviting, appetite-focused visuals with clear menu/package pricing.
-*   **Required Sections:** SimpleHeader, VisualHero, PackageGrid/DailyMenu, TestimonialSlider, EventBooking CTA, BasicFooter.
-
-**4. Artisan Market (Makers, farmers market vendors)**
-*   **If Primary Goal is Direct Checkout or Custom Order:** Use the \`creative-studio\` or \`editorial\` style preset.
-*   **Design Tone:** Warm, textured, storytelling-led, highlighting craftsmanship.
-*   **Required Sections:** SimpleHeader, EditorialHero, MakerProfiles/BrandStory, ProductGrid, EventCalendar, BasicFooter.
-
-**5. Event & Floral (Florists, event rentals)**
-*   **If Primary Goal is Quote Generation or Booking:** Use the \`boutique-luxury\` or \`editorial\` style preset.
-*   **Design Tone:** Elegant, romantic, premium gallery-led selling.
-*   **Required Sections:** SimpleHeader, SplitHero, ShopByOccasion, GalleryGrid, InquiryFlow/BookingCTA, ServiceFooter.
-
----
-
-### **OUTPUT REQUIREMENTS**
-Generate a valid JSON \`EdgeRootProps\` manifest and a Puck starter content array. Your JSON output must include:
-
-1.  **Root Metadata:** \`siteName\`, \`businessType\`, \`templateFamily\`, \`stylePreset\`, \`checkoutMode\` (mapped from Primary Goal), and \`supportEmail\`.
-2.  **Starter Copy:** Transform the "Elevator Pitch" into a high-converting Hero Headline, subheadline, and at least one "Brand Story" or "About" section block.
-3.  **CTA Labels:** Generate context-aware button text (e.g., "Book a Consultation," "Shop the Collection," "Request a Custom Quote"). 
-4.  **Section Stack:** Output the strict top-to-bottom array of Puck components (e.g., exactly 1 header, at least 1 hero, 1 conversion section, 1 footer). 
-5.  **Images:** For EVERY image field, use real images prompted from the business description. URL format: https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&q=80&w=1200 (Use actual Unsplash image URLs if possible, or high quality placeholder images based on the business type).
-
-Output **only** the requested valid JSON structure without markdown wrappers or conversational filler. Ensure all text aligns with the tone dictated by the Design Matrix.
-
-{
-  "content": [
-    {
-      "type": "string",
-      "props": {
-        "id": "string",
-        "title": "string",
-        "heading": "string",
-        "subheading": "string",
-        "ctaText": "string",
-        "image": "string",
-        "items": [{ "name": "string", "title": "string", "description": "string", "price": "string", "image": "string", "features": [{"label":"string"}] }],
-        "images": [{ "image": "string" }],
-        "questions": [{ "q": "string", "a": "string" }]
-      }
-    }
-  ],
-  "root": {
-    "title": "string",
-    "theme": {
-      "stylePreset": "string"
-    }
+    res.json({ draft });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
-}`;
+});
 
-    let data;
+router.put('/sites/:siteId/draft', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    const draft = {
+      ...(req.body as MarketplaceSiteDraft),
+      siteId: req.params.siteId,
+    };
+    const result = await saveMarketplaceDraftSnapshot(draft);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
 
-    if (geminiApiKey) {
-      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-      
-      const result = await ai.models.generateContent({
-        model: "gemini-1.5-pro",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-        }
-      });
-      
-      data = JSON.parse(result.text || "{}");
-    } else {
-      const openai = new OpenAI({ apiKey: openaiApiKey! });
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" }
-      });
-      
-      data = JSON.parse(response.choices[0].message.content || "{}");
+router.post('/generate-page', async (req, res) => {
+  try {
+    const intake = req.body as MarketplaceIntakeData;
+    const data = await generatePageManifest(intake);
+    res.json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+router.get('/sites/:siteId/inventory', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    const items = await getInventory(req.params.siteId);
+    res.json({ items });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+router.put('/sites/:siteId/inventory', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    const items = (req.body.items || []) as InventoryItem[];
+    const result = await replaceInventory(req.params.siteId, items);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+router.post('/sites/:siteId/checkout-intents', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    const record = await saveCheckoutIntent(req.params.siteId, req.body);
+    res.status(201).json(record);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+router.post('/sites/:siteId/deploy', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+
+    const payload = req.body as LaunchRequest & { idempotencyKey?: string };
+    const siteId = req.params.siteId;
+    const idempotencyKey = readIdempotencyKey(req, siteId, payload.selectedPlan);
+
+    const deployment = await requestDeployment(siteId, payload.selectedPlan, idempotencyKey);
+    await saveLaunchPlan(siteId, deployment.plan);
+    const reconciled = await reconcileDeployment(siteId);
+
+    res.json(reconciled || deployment);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+router.post('/internal/deployments/:deploymentId/events', async (req, res) => {
+  try {
+    if (!requireWebhookSecret(req, res)) return;
+
+    const requestedStatus = req.body?.status;
+    if (typeof requestedStatus !== 'string' || !requestedStatus.trim()) {
+      res.status(400).json({ error: 'Webhook payload must include a non-empty status.' });
+      return;
+    }
+
+    const deployment = await applyDeploymentEventByDeploymentId(req.params.deploymentId, req.body || {});
+    if (!deployment) {
+      res.status(404).json({ error: 'Deployment not found.' });
+      return;
+    }
+
+    if (deployment.status !== requestedStatus) {
+      res.status(409).json({ error: `Invalid deployment transition to ${requestedStatus}.`, deployment });
+      return;
+    }
+
+    res.json({ deployment });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+router.get('/sites/:siteId/status', async (req, res) => {
+  try {
+    if (!(await requireSiteAccess(req, res))) return;
+    const reconciled = await reconcileDeployment(req.params.siteId);
+    const deployment = reconciled || await getDeployment(req.params.siteId);
+    const inventory = await getInventory(req.params.siteId);
+    res.json({
+      deployment,
+      inventoryCount: inventory.length,
+      capabilities: await getCapabilities(),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// Manual reconciliation endpoint for operators
+router.post('/internal/reconcile/:siteId', async (req, res) => {
+  try {
+    // Require webhook secret for operator auth
+    if (!requireWebhookSecret(req, res)) return;
+    
+    const siteId = req.params.siteId;
+    const deployment = await reconcileDeployment(siteId);
+    
+    if (!deployment) {
+      res.status(404).json({ error: 'No deployment found for this site.' });
+      return;
     }
     
-    res.json(data);
-  } catch (error: any) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    res.json({ 
+      message: 'Reconciliation complete.',
+      deployment,
+      capabilities: await getCapabilities(),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
