@@ -195,11 +195,23 @@ export default function App() {
           </Route>
           
           <Route path="/checkout">
-            {intakeData ? (
+            {intakeData && editorState ? (
               <CheckoutPage 
-                intakeData={intakeData}
+                draft={{
+                  siteId: `client-${intakeData.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 12)}-${editorState.templateFamily}`,
+                  slug: intakeData.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  status: 'launch_ready',
+                  selectedPlan: 'launch',
+                  intakeData,
+                  templateFamily: editorState.templateFamily,
+                  rootProps: editorState.rootProps,
+                  editorData: { content: [] },
+                  inventoryItems: [],
+                } as any}
                 onBack={() => setLocation('/editor')}
-                onComplete={(plan) => {
+                onComplete={(_plan, _deployment) => {
                   setLocation('/published');
                 }}
               />
@@ -211,8 +223,24 @@ export default function App() {
           </Route>
           
           <Route path="/published">
-            {intakeData ? (
-              <PublishedPage intakeData={intakeData} />
+            {intakeData && editorState ? (
+              <PublishedPage 
+                draft={{
+                  siteId: `client-${intakeData.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 12)}-${editorState.templateFamily}`,
+                  slug: intakeData.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  status: 'launch_ready',
+                  selectedPlan: 'launch',
+                  intakeData,
+                  templateFamily: editorState.templateFamily,
+                  rootProps: editorState.rootProps,
+                  editorData: { content: [] },
+                  inventoryItems: [],
+                } as any}
+                onBack={() => setLocation('/checkout')}
+                onDeploymentUpdate={() => {}}
+              />
             ) : (
               <div className="p-20 text-center">
                 <p>No deployment data found. Please complete <a href="/onboarding" className="underline">onboarding</a>.</p>
