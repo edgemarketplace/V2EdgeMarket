@@ -8,6 +8,10 @@ import * as Trust from "./blocks/Trust";
 import * as Media from "./blocks/Media";
 import * as Conversion from "./blocks/Conversion";
 import * as Footer from "./blocks/Footer";
+import {
+  commerceComponentConfigs,
+  commerceCategories,
+} from "../../../packages/edge-commerce/src/index";
 
 // Combine for easy access if needed, or use specific ones
 const Blocks = { ...Header, ...Hero, ...Grid, ...Story, ...Trust, ...Media, ...Conversion, ...Footer };
@@ -76,7 +80,9 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
       trust: { components: ["TrustReviews", "TrustTestimonials", "TrustLogos", "TrustStats"], title: "Trust/proof" },
       media: { components: ["MediaGallery", "MediaVideo", "MediaBeforeAfter"], title: "Media" },
       conversion: { components: ["ConversionFAQ", "ConversionNewsletter", "ConversionQuoteCTA", "ConversionStickyPromo"], title: "Conversion" },
-      footers: { components: ["FooterBasic", "FooterCommerce", "FooterService"], title: "Footers" }
+      footers: { components: ["FooterBasic", "FooterCommerce", "FooterService"], title: "Footers" },
+      // Commerce-native components
+      ...commerceCategories,
     },
     root: {
       // @ts-ignore - We only want to expose specific fields in the root editor, not all of EdgeRootProps
@@ -116,6 +122,9 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
       }
     },
     components: {
+      // Commerce-native components (Priority C)
+      ...commerceComponentConfigs.components,
+
       // HEADERS
       HeaderSimple: {
         fields: { title: { type: "text" }, navLinks: { type: "array", arrayFields: { label: { type: "text" }, href: { type: "text" } } } },
