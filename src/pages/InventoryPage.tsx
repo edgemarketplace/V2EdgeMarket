@@ -50,7 +50,6 @@ export function InventoryPage({
 
   useEffect(() => {
     onSaveDraft(items.filter((item) => item.name.trim()));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
   const totalItems = items.filter((item) => item.name.trim()).length;
@@ -212,149 +211,10 @@ export function InventoryPage({
           <div className="bg-white border border-black/5 rounded-[24px] px-5 py-4 text-sm font-bold">{summary}</div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.5fr] gap-8">
+        {/* MAIN CONTENT: Single column, Business Inventory on top */}
+        <div className="space-y-8">
           
-          {/* LEFT: Inventory Intake */}
-          <section className="bg-white border border-black/5 rounded-[32px] p-6 md:p-8">
-            <h2 className="text-2xl font-serif italic mb-4">Inventory Intake</h2>
-            <p className="text-xs text-black/50 italic mb-6">Import your existing catalog or add items manually.</p>
-            
-            {/* Intake Method Tabs */}
-            <div className="grid grid-cols-3 gap-2 mb-6">
-              {[
-                { id: 'text' as const, label: 'Quick Text', icon: FileText },
-                { id: 'file' as const, label: 'Upload CSV/Doc', icon: Upload },
-                { id: 'manual' as const, label: 'Line Items', icon: List },
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setActiveIntakeTab(m.id)}
-                  className={`flex flex-col items-center gap-2 p-3 border transition-all text-xs font-bold uppercase tracking-widest ${
-                    activeIntakeTab === m.id
-                      ? 'bg-black text-white border-black'
-                      : 'bg-transparent text-black/40 border-black/10 hover:border-black/30'
-                  }`}
-                >
-                  <m.icon className="w-4 h-4" />
-                  {m.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Text Import */}
-            {activeIntakeTab === 'text' && (
-              <div className="space-y-4">
-                <p className="text-xs text-black/50 italic">Paste a list of products, descriptions, or just raw notes. Our AI will structure it for your hub.</p>
-                <textarea 
-                  rows={10}
-                  value={csvText}
-                  onChange={(e) => setCsvText(e.target.value)}
-                  className="block w-full border border-black/10 bg-black/[0.02] p-4 focus:outline-none focus:border-black text-sm transition-colors font-mono"
-                  placeholder="Example:
-Handmade Blue Vase - $45 - Unique ceramic piece
-Organic Cotton Tote - $25 - Locally sourced..."
-                />
-                <button onClick={importCsv} className="w-full border border-black px-4 py-3 rounded-full font-bold text-sm">
-                  Import Text
-                </button>
-              </div>
-            )}
-
-            {/* File Upload */}
-            {activeIntakeTab === 'file' && (
-              <div className="flex flex-col items-center justify-center h-[300px] border-2 border-dashed border-black/10 bg-black/[0.01] rounded-xl hover:bg-black/[0.03] transition-colors cursor-pointer group">
-                <Upload className="w-10 h-10 text-black/20 group-hover:text-black transition-colors mb-4" />
-                <p className="text-sm font-bold">Drop CSV, PDF, or Word Document</p>
-                <p className="text-[10px] uppercase tracking-widest text-black/30 mt-2">Max file size 10MB</p>
-                <input 
-                  type="file" 
-                  className="hidden" 
-                  accept=".csv,.pdf,.doc,.docx"
-                />
-              </div>
-            )}
-
-            {/* Manual Entry */}
-            {activeIntakeTab === 'manual' && (
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                {manualItems.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-4 items-start bg-black/[0.02] p-4 border border-black/5 rounded-lg">
-                    <div className="col-span-6">
-                       <input 
-                         value={item.name}
-                         onChange={(e) => {
-                           const newItems = [...manualItems];
-                           newItems[index].name = e.target.value;
-                           setManualItems(newItems);
-                         }}
-                         placeholder="Item Name"
-                         className="w-full bg-transparent border-b border-black/5 py-2 font-bold focus:outline-none focus:border-black transition-colors"
-                       />
-                    </div>
-                    <div className="col-span-4">
-                       <input 
-                         value={item.price}
-                         onChange={(e) => {
-                           const newItems = [...manualItems];
-                           newItems[index].price = e.target.value;
-                           setManualItems(newItems);
-                         }}
-                         type="number"
-                         placeholder="Price"
-                         className="w-full bg-transparent border-b border-black/5 py-2 focus:outline-none focus:border-black transition-colors"
-                       />
-                    </div>
-                    <div className="col-span-2 flex justify-end">
-                       <button 
-                        type="button" 
-                        onClick={() => setManualItems(manualItems.filter((_, i) => i !== index))}
-                        className="p-2 text-black/20 hover:text-red-500 transition-colors"
-                       >
-                         <Trash2 className="w-4 h-4" />
-                       </button>
-                    </div>
-                  </div>
-                ))}
-                <button 
-                  type="button" 
-                  onClick={() => setManualItems([...manualItems, { name: '', price: '', description: '' }])}
-                  className="w-full py-4 border border-dashed border-black/10 text-black/40 hover:text-black hover:border-black transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Item
-                </button>
-              </div>
-            )}
-
-            {/* Quick Actions */}
-            <div className="mt-6 pt-6 border-t border-black/5 space-y-3">
-              <button onClick={generateStarterItems} className="w-full border border-black/10 font-bold text-sm inline-flex items-center gap-2 justify-center py-3 rounded-full">
-                <Sparkles className="w-4 h-4" />
-                Generate Starters
-              </button>
-            </div>
-
-            {/* Entity Types Reference */}
-            <div className="mt-6 bg-black/[0.02] p-4 border border-black/5 rounded-lg">
-              <p className="text-[10px] uppercase tracking-widest font-bold text-black/30 mb-3">Inventory Types</p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {[
-                  { type: 'Product', fields: 'Price, SKU, Stock' },
-                  { type: 'Service', fields: 'Duration, Radius, Pricing' },
-                  { type: 'Package', fields: 'Items, Billing, Features' },
-                  { type: 'Booking Slot', fields: 'Time, Capacity, Availability' }
-                ].map((item) => (
-                  <div key={item.type} className="p-2 border border-black/5 rounded">
-                    <p className="font-bold">{item.type}</p>
-                    <p className="text-black/40 text-[10px]">{item.fields}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* RIGHT: Business Inventory */}
+          {/* SECTION 1: Business Inventory (TOP) */}
           <section className="bg-white border border-black/5 rounded-[32px] p-6 md:p-8">
             <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
               <h2 className="text-2xl font-serif italic">Inventory Items</h2>
@@ -370,6 +230,10 @@ Organic Cotton Tote - $25 - Locally sourced..."
                 <button onClick={() => addItem('package')} className="px-4 py-3 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold text-sm inline-flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
                   Add package
+                </button>
+                <button onClick={generateStarterItems} className="px-4 py-3 rounded-full border border-black/10 font-bold text-sm inline-flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Generate starters
                 </button>
               </div>
             </div>
@@ -525,6 +389,45 @@ Organic Cotton Tote - $25 - Locally sourced..."
                 </div>
               )}
             </div>
+          </section>
+
+          {/* SECTION 2: CSV Quick Import (BELOW) */}
+          <section className="bg-white border border-black/5 rounded-[32px] p-6 md:p-8">
+            <h2 className="text-2xl font-serif italic mb-4">CSV Quick Import</h2>
+            <p className="text-sm text-black/60 mb-4">Paste comma-separated data with headers: name,price,category,description,type,duration,serviceRadius,pricingModel</p>
+            <textarea
+              rows={10}
+              value={csvText}
+              onChange={(e) => setCsvText(e.target.value)}
+              className="w-full border border-black/10 rounded-[24px] px-4 py-4 bg-[#F9F8F6] mb-4"
+            />
+            <button onClick={importCsv} className="w-full border border-black px-4 py-3 rounded-full font-bold">
+              Import CSV rows
+            </button>
+          </section>
+
+          {/* SECTION 3: Entity Types Reference */}
+          <section className="bg-[#1A1A1A] text-white rounded-[32px] p-6 md:p-8">
+            <h2 className="text-2xl font-serif italic mb-4">Entity Types</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { icon: 'P', title: 'Product', desc: 'Physical/digital goods with price and category.', color: 'white/10' },
+                { icon: <Clock className="w-5 h-5 text-blue-400" />, title: 'Service', desc: 'Duration, service radius, pricing model (hourly/fixed).', color: 'blue-900/30' },
+                { icon: <DollarSign className="w-5 h-5 text-emerald-400" />, title: 'Package/Subscription', desc: 'Features list, billing cycle (monthly/yearly/one-time).', color: 'emerald-900/30' },
+                { icon: <Calendar className="w-5 h-5 text-purple-400" />, title: 'Booking Slot', desc: 'Availability windows, capacity, recurrence.', color: 'purple-900/30' },
+              ].map((item, i) => (
+                <div key={i} className={`flex items-start gap-3 p-4 rounded-2xl bg-${item.color}`}>
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {typeof item.icon === 'string' ? <span className="text-[10px] font-bold">{item.icon}</span> : item.icon}
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm">{item.title}</p>
+                    <p className="text-xs text-white/60 mt-1">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-white/50 mt-4">{status || 'Nothing saved yet.'}</p>
           </section>
         </div>
 
