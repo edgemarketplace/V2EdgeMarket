@@ -1,4 +1,4 @@
-import { getMarketplaceDraftSnapshot, saveMarketplaceDraftSnapshot } from '../../../src/server/siteStore';
+import { getMarketplaceDraftSnapshot, saveMarketplaceDraftSnapshot } from '../server/siteStore';
 
 export const config = { maxDuration: 30 };
 
