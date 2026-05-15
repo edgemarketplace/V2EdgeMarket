@@ -2,10 +2,8 @@ export const config = {
   maxDuration: 10,
 };
 
-export default async function handler(_req: any, res: any) {
+export default async function handler(_req, res) {
   try {
-    // Simplified: return basic health without importing siteStore
-    // TODO: re-add getCapabilities() once module import is fixed
     res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),
@@ -14,7 +12,7 @@ export default async function handler(_req: any, res: any) {
         hasServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({
       status: 'error',
       error: error?.message || String(error),
