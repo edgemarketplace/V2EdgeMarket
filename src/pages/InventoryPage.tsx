@@ -116,7 +116,7 @@ export function InventoryPage({
     setSaving(true);
     setStatus('Saving inventory…');
     try {
-      const response = await fetch(`/api/sites/${draft.siteId}/inventory`, {
+      const response = await fetch(`/api/inventory?siteId=${encodeURIComponent(draft.siteId)}`, {
         method: 'PUT',
         headers: buildSiteHeaders(draft),
         body: JSON.stringify({ items: nextItems.filter((item) => item.name.trim()) }),

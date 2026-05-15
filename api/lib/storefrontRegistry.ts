@@ -1,11 +1,11 @@
-import * as Header from '../components/puck/blocks/Header';
-import * as Hero from '../components/puck/blocks/Hero';
-import * as Grid from '../components/puck/blocks/Grid';
-import * as Story from '../components/puck/blocks/Story';
-import * as Trust from '../components/puck/blocks/Trust';
-import * as Media from '../components/puck/blocks/Media';
-import * as Conversion from '../components/puck/blocks/Conversion';
-import * as Footer from '../components/puck/blocks/Footer';
+import * as Header from '../../src/components/puck/blocks/Header';
+import * as Hero from '../../src/components/puck/blocks/Hero';
+import * as Grid from '../../src/components/puck/blocks/Grid';
+import * as Story from '../../src/components/puck/blocks/Story';
+import * as Trust from '../../src/components/puck/blocks/Trust';
+import * as Media from '../../src/components/puck/blocks/Media';
+import * as Conversion from '../../src/components/puck/blocks/Conversion';
+import * as Footer from '../../src/components/puck/blocks/Footer';
 
 export const storefrontRegistry = {
   ...Header,

@@ -39,7 +39,7 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
   useEffect(() => {
     if (!siteId) return;
     setWorkflowLoading(true);
-    fetch(`/api/sites/${siteId}/workflow`, {
+    fetch(`/api/workflow?siteId=${encodeURIComponent(siteId)}`, {
       headers: { 'x-site-token': localStorage.getItem(`site-token-${siteId}`) || '' }
     })
       .then(res => res.json())
@@ -56,7 +56,7 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
   // Fetch hydration blockers from API
   useEffect(() => {
     if (!siteId) return;
-    fetch(`/api/sites/${siteId}/hydration-validation`, {
+    fetch(`/api/hydration-validation?siteId=${encodeURIComponent(siteId)}`, {
       headers: { 'x-site-token': localStorage.getItem(`site-token-${siteId}`) || '' }
     })
       .then(res => res.json())
@@ -70,7 +70,7 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
   
   const saveWorkflowState = (newState: any) => {
     if (!siteId) return Promise.resolve();
-    return fetch(`/api/sites/${siteId}/workflow`, {
+    return fetch(`/api/workflow?siteId=${encodeURIComponent(siteId)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
