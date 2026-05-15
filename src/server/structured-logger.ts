@@ -1,7 +1,7 @@
 // Phase 4: Structured Logging
 // Replaces console.log with typed event payloads for JSON-based observability.
 
-import crypto from 'node:crypto';
+import * as crypto from 'node:crypto';
 
 // ── Correlation context ────────────────────────────────────────────
 
