@@ -1,17 +1,27 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
-import { InventoryItem, MarketplaceSiteDraft } from '../lib/types';
+import { ArrowLeft, ArrowRight, Plus, Save, Sparkles, Trash2, Clock, MapPin, DollarSign, Calendar } from 'lucide-react';
+import { InventoryItem, InventoryEntityType, MarketplaceSiteDraft, AvailabilityWindow } from '../lib/types';
 import { buildSiteHeaders } from '../lib/siteDrafts';
+import { validateInventoryItem, validateService, validatePackage } from '../lib/commerce-runtime';
 
-function parseCsv(raw: string): InventoryItem[] {
+function parseCsv(raw: string): Partial<InventoryItem>[] {
   return raw
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(1)
     .map((line) => {
-      const [name, price, category, description] = line.split(',');
-      return { name: name?.trim() || '', price: price?.trim() || '', category: category?.trim() || '', description: description?.trim() || '' };
+      const [name, price, category, description, type, duration, serviceRadius, pricingModel] = line.split(',');
+      return {
+        name: name?.trim() || '',
+        price: price?.trim() || '',
+        category: category?.trim() || '',
+        description: description?.trim() || '',
+        type: (type?.trim() as InventoryEntityType) || undefined,
+        duration: duration ? parseInt(duration) : undefined,
+        serviceRadius: serviceRadius ? parseInt(serviceRadius) : undefined,
+        pricingModel: pricingModel?.trim() as any || undefined,
+      };
     })
     .filter((item) => item.name);
 }
@@ -28,7 +38,7 @@ export function InventoryPage({
   onSaveDraft: (items: InventoryItem[]) => void;
 }) {
   const [items, setItems] = useState<InventoryItem[]>(draft.inventoryItems || []);
-  const [csvText, setCsvText] = useState('name,price,category,description');
+  const [csvText, setCsvText] = useState('name,price,category,description,type,duration,serviceRadius,pricingModel');
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
 
@@ -46,8 +56,12 @@ export function InventoryPage({
   const hasProducts = totalItems > 0;
 
   const summary = useMemo(() => {
-    const categories = new Set(items.map((item) => item.category).filter(Boolean));
-    return `${totalItems} items${categories.size ? ` across ${categories.size} categories` : ''}`;
+    const byType = items.reduce((acc, item) => {
+      const t = item.type || 'product';
+      acc[t] = (acc[t] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    return `${totalItems} items: ${Object.entries(byType).map(([k, v]) => `${v} ${k}`).join(', ')}`;
   }, [items, totalItems]);
 
   function updateItem(index: number, patch: Partial<InventoryItem>) {
@@ -63,12 +77,40 @@ export function InventoryPage({
     reader.readAsDataURL(file);
   }
 
-  function addItem() {
-    setItems((current) => [...current, { name: '', price: '', category: '', description: '' }]);
+  function addItem(type: InventoryEntityType = 'product') {
+    const base: InventoryItem = {
+      name: '',
+      price: '',
+      category: '',
+      description: '',
+      type,
+    };
+    // Set sensible defaults based on type
+    if (type === 'service') {
+      base.duration = 60;
+      base.pricingModel = 'hourly';
+      base.serviceRadius = 25;
+    } else if (type === 'package' || type === 'subscription') {
+      base.pricingModel = 'fixed';
+      base.features = [];
+    }
+    setItems((current) => [...current, base]);
   }
 
   function removeItem(index: number) {
     setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function getValidationErrors(item: InventoryItem): string[] {
+    let result;
+    if (item.type === 'service') {
+      result = validateService(item);
+    } else if (item.type === 'package' || item.type === 'subscription') {
+      result = validatePackage(item);
+    } else {
+      result = validateInventoryItem(item);
+    }
+    return result.errors.map((e) => e.message);
   }
 
   async function persist(nextItems = items) {
@@ -98,26 +140,78 @@ export function InventoryPage({
 
   async function importCsv() {
     const parsed = parseCsv(csvText);
-    const nextItems = [...items, ...parsed];
+    const nextItems = [...items, ...(parsed as InventoryItem[])];
     setItems(nextItems);
     await persist(nextItems);
   }
 
   function generateStarterItems() {
-    const generated: InventoryItem[] = draft.intakeData.primaryGoal === 'quote'
+    const isServiceBusiness = draft.intakeData?.primaryGoal === 'quote';
+    const generated: InventoryItem[] = isServiceBusiness
       ? [
-          { name: 'Signature package', category: 'Packages', price: '2500', description: 'A high-value service package for your best-fit client.' },
-          { name: 'Custom project', category: 'Custom', price: '5000', description: 'Tailored work for larger or more specialized requests.' },
+          {
+            name: 'On-site Consultation',
+            type: 'service' as InventoryEntityType,
+            price: '150',
+            category: 'Consulting',
+            description: 'Initial site visit and needs assessment.',
+            duration: 90,
+            pricingModel: 'hourly' as const,
+            serviceRadius: 30,
+          },
+          {
+            name: 'Premium Installation Package',
+            type: 'package' as InventoryEntityType,
+            price: '2500',
+            category: 'Packages',
+            description: 'Full service with materials and warranty.',
+            features: ['All materials included', '2-year warranty', 'Flexible scheduling'],
+            pricingModel: 'fixed' as const,
+          },
+          {
+            name: 'Monthly Maintenance Plan',
+            type: 'subscription' as InventoryEntityType,
+            price: '299',
+            category: 'Subscriptions',
+            description: 'Recurring monthly service visits.',
+            features: ['Monthly inspection', 'Priority support', '10% discount on parts'],
+            billingCycle: 'monthly' as const,
+          },
         ]
       : [
-          { name: 'Best seller', category: 'Featured', price: '95', description: 'A strong starter product with broad appeal.' },
-          { name: 'Premium item', category: 'Premium', price: '145', description: 'Higher-ticket offer for your most engaged buyers.' },
-          { name: 'Seasonal release', category: 'New', price: '125', description: 'Fresh inventory for launches and campaigns.' },
+          {
+            name: 'Best Seller Package',
+            type: 'product' as InventoryEntityType,
+            price: '95',
+            category: 'Featured',
+            description: 'A strong starter product with broad appeal.',
+          },
+          {
+            name: 'Premium Upgrade Kit',
+            type: 'product' as InventoryEntityType,
+            price: '145',
+            category: 'Premium',
+            description: 'Higher-ticket offer for your most engaged buyers.',
+          },
         ];
 
     const nextItems = [...items, ...generated];
     setItems(nextItems);
     setStatus('Starter items generated locally. Save to sync them.');
+  }
+
+  function getEntityIcon(type?: InventoryEntityType) {
+    switch (type) {
+      case 'service':
+        return <Clock className="w-3 h-3" />;
+      case 'package':
+      case 'subscription':
+        return <DollarSign className="w-3 h-3" />;
+      case 'booking_slot':
+        return <Calendar className="w-3 h-3" />;
+      default:
+        return null;
+    }
   }
 
   return (
@@ -126,8 +220,10 @@ export function InventoryPage({
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div>
             <p className="text-[11px] uppercase tracking-[0.3em] font-bold text-black/35 mb-3">Step 2 of 3</p>
-            <h1 className="text-4xl md:text-6xl font-serif italic tracking-tight">Real inventory starts here.</h1>
-            <p className="text-black/60 mt-3">This route is where catalog truth lives. Your launch status and optional Medusa sync both depend on what you save here.</p>
+            <h1 className="text-4xl md:text-6xl font-serif italic tracking-tight">Business inventory</h1>
+            <p className="text-black/60 mt-3">
+              Add your products, services, packages, and booking slots. Each type has its own business-native fields (duration, pricing model, service radius).
+            </p>
           </div>
           <div className="bg-white border border-black/5 rounded-[24px] px-5 py-4 text-sm font-bold">{summary}</div>
         </div>
@@ -137,84 +233,173 @@ export function InventoryPage({
             <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
               <h2 className="text-2xl font-serif italic">Inventory items</h2>
               <div className="flex gap-3 flex-wrap">
+                <button onClick={() => addItem('product')} className="px-4 py-3 rounded-full border border-black/10 font-bold text-sm inline-flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add product
+                </button>
+                <button onClick={() => addItem('service')} className="px-4 py-3 rounded-full border border-blue-200 bg-blue-50 text-blue-800 font-bold text-sm inline-flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Add service
+                </button>
+                <button onClick={() => addItem('package')} className="px-4 py-3 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold text-sm inline-flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" />
+                  Add package
+                </button>
                 <button onClick={generateStarterItems} className="px-4 py-3 rounded-full border border-black/10 font-bold text-sm inline-flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
-                  Add starter items
-                </button>
-                <button onClick={addItem} className="px-4 py-3 rounded-full bg-black text-white font-bold text-sm inline-flex items-center gap-2">
-                  <Plus className="w-4 h-4" />
-                  Add item
+                  Generate starters
                 </button>
               </div>
             </div>
 
             <div className="space-y-4">
-              {items.map((item, index) => (
-                <div key={`${item.id || 'item'}-${index}`} className="border border-black/5 rounded-[24px] p-4 bg-[#F9F8F6] space-y-3">
-                  <div className="grid grid-cols-12 gap-3">
-                    <input
-                      value={item.name}
-                      onChange={(e) => updateItem(index, { name: e.target.value })}
-                      placeholder="Name"
-                      className="col-span-12 md:col-span-3 bg-white border border-black/10 rounded-2xl px-4 py-3"
-                    />
-                    <input
-                      value={item.price || ''}
-                      onChange={(e) => updateItem(index, { price: e.target.value })}
-                      placeholder="Price"
-                      className="col-span-6 md:col-span-2 bg-white border border-black/10 rounded-2xl px-4 py-3"
-                    />
-                    <input
-                      value={item.category || ''}
-                      onChange={(e) => updateItem(index, { category: e.target.value })}
-                      placeholder="Category"
-                      className="col-span-6 md:col-span-3 bg-white border border-black/10 rounded-2xl px-4 py-3"
-                    />
-                    <input
-                      value={item.description || ''}
-                      onChange={(e) => updateItem(index, { description: e.target.value })}
-                      placeholder="Description"
-                      className="col-span-8 md:col-span-3 bg-white border border-black/10 rounded-2xl px-4 py-3"
-                    />
-                    <div className="col-span-4 md:col-span-1 flex items-center justify-center gap-2">
-                      {item.image ? (
-                        <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-black/10">
-                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                          <button
-                            onClick={() => updateItem(index, { image: undefined })}
-                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[8px]"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="w-10 h-10 border-2 border-dashed border-black/20 rounded-lg flex items-center justify-center cursor-pointer hover:border-black/40 transition-colors">
+              {items.map((item, index) => {
+                const errors = getValidationErrors(item);
+                return (
+                  <div key={`${item.id || 'item'}-${index}`} className={`border rounded-[24px] p-4 space-y-3 ${errors.length ? 'border-amber-300 bg-amber-50' : 'border-black/5 bg-[#F9F8F6]'}`}>
+                    <div className="grid grid-cols-12 gap-3">
+                      {/* Type badge */}
+                      <div className="col-span-12 flex items-center gap-2">
+                        <select
+                          value={item.type || 'product'}
+                          onChange={(e) => updateItem(index, { type: e.target.value as InventoryEntityType })}
+                          className="text-xs font-bold uppercase tracking-wider px-2 py-1 rounded border border-black/10 bg-white"
+                        >
+                          <option value="product">Product</option>
+                          <option value="service">Service</option>
+                          <option value="package">Package</option>
+                          <option value="subscription">Subscription</option>
+                          <option value="booking_slot">Booking Slot</option>
+                        </select>
+                        {getEntityIcon(item.type)}
+                        <span className="text-xs text-black/40">{item.type || 'product'}</span>
+                      </div>
+
+                      <input
+                        value={item.name}
+                        onChange={(e) => updateItem(index, { name: e.target.value })}
+                        placeholder="Name *"
+                        className="col-span-12 md:col-span-4 bg-white border border-black/10 rounded-2xl px-4 py-3"
+                      />
+                      <input
+                        value={item.price || ''}
+                        onChange={(e) => updateItem(index, { price: e.target.value })}
+                        placeholder="Price *"
+                        className="col-span-6 md:col-span-2 bg-white border border-black/10 rounded-2xl px-4 py-3"
+                      />
+                      <input
+                        value={item.category || ''}
+                        onChange={(e) => updateItem(index, { category: e.target.value })}
+                        placeholder="Category"
+                        className="col-span-6 md:col-span-3 bg-white border border-black/10 rounded-2xl px-4 py-3"
+                      />
+                      <input
+                        value={item.description || ''}
+                        onChange={(e) => updateItem(index, { description: e.target.value })}
+                        placeholder="Description"
+                        className="col-span-8 md:col-span-3 bg-white border border-black/10 rounded-2xl px-4 py-3"
+                      />
+
+                      {/* Service-native fields */}
+                      {item.type === 'service' && (
+                        <>
                           <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleImageUpload(index, file);
-                            }}
+                            value={item.duration || ''}
+                            onChange={(e) => updateItem(index, { duration: parseInt(e.target.value) || undefined })}
+                            placeholder="Duration (min)"
+                            type="number"
+                            className="col-span-4 md:col-span-2 bg-white border border-blue-200 rounded-2xl px-4 py-3 text-xs"
                           />
-                          <span className="text-[10px]">📷</span>
-                        </label>
+                          <input
+                            value={item.serviceRadius || ''}
+                            onChange={(e) => updateItem(index, { serviceRadius: parseInt(e.target.value) || undefined })}
+                            placeholder="Radius (mi)"
+                            type="number"
+                            className="col-span-4 md:col-span-2 bg-white border border-blue-200 rounded-2xl px-4 py-3 text-xs"
+                          />
+                          <select
+                            value={item.pricingModel || 'hourly'}
+                            onChange={(e) => updateItem(index, { pricingModel: e.target.value as any })}
+                            className="col-span-4 md:col-span-2 bg-white border border-blue-200 rounded-2xl px-4 py-3 text-xs"
+                          >
+                            <option value="hourly">Hourly</option>
+                            <option value="fixed">Fixed</option>
+                            <option value="package">Package</option>
+                          </select>
+                        </>
                       )}
+
+                      {/* Package/Subscription fields */}
+                      {(item.type === 'package' || item.type === 'subscription') && (
+                        <>
+                          <select
+                            value={item.billingCycle || 'one-time'}
+                            onChange={(e) => updateItem(index, { billingCycle: e.target.value as any })}
+                            className="col-span-4 md:col-span-2 bg-white border border-emerald-200 rounded-2xl px-4 py-3 text-xs"
+                          >
+                            <option value="one-time">One-time</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                          </select>
+                          <input
+                            value={item.features?.join(', ') || ''}
+                            onChange={(e) => updateItem(index, { features: e.target.value.split(',').map((f) => f.trim()).filter(Boolean) })}
+                            placeholder="Features (comma-separated)"
+                            className="col-span-8 md:col-span-4 bg-white border border-emerald-200 rounded-2xl px-4 py-3 text-xs"
+                          />
+                        </>
+                      )}
+
+                      <div className="col-span-4 md:col-span-1 flex items-center justify-center gap-2">
+                        {item.image ? (
+                          <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-black/10">
+                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                            <button
+                              onClick={() => updateItem(index, { image: undefined })}
+                              className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[8px]"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="w-10 h-10 border-2 border-dashed border-black/20 rounded-lg flex items-center justify-center cursor-pointer hover:border-black/40 transition-colors">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(index, file);
+                              }}
+                            />
+                            <span className="text-[10px]">📷</span>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Validation errors */}
+                    {errors.length > 0 && (
+                      <div className="text-xs text-amber-700 space-y-1">
+                        {errors.map((err, i) => (
+                          <div key={i}>⚠️ {err}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end">
+                      <button onClick={() => removeItem(index)} className="rounded-2xl border border-black/10 bg-white px-4 py-2 flex items-center gap-2 text-sm">
+                        <Trash2 className="w-4 h-4" />
+                        Remove
+                      </button>
                     </div>
                   </div>
-                  <div className="flex justify-end">
-                    <button onClick={() => removeItem(index)} className="rounded-2xl border border-black/10 bg-white px-4 py-2 flex items-center gap-2 text-sm">
-                      <Trash2 className="w-4 h-4" />
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               {!items.length && (
                 <div className="border border-dashed border-black/10 rounded-[28px] p-10 text-center text-black/45">
-                  Add products, services, or packages here. Once saved, this inventory becomes the source for launch readiness and storefront rendering.
+                  Add products, services, packages, or booking slots. Each type has business-native fields (duration, pricing model, service radius, features).
                 </div>
               )}
             </div>
@@ -223,7 +408,7 @@ export function InventoryPage({
           <aside className="space-y-6">
             <div className="bg-white border border-black/5 rounded-[32px] p-6">
               <h2 className="text-2xl font-serif italic mb-4">CSV quick import</h2>
-              <p className="text-sm text-black/60 mb-4">Paste comma-separated data with headers: name,price,category,description</p>
+              <p className="text-sm text-black/60 mb-4">Paste comma-separated data with headers: name,price,category,description,type,duration,serviceRadius,pricingModel</p>
               <textarea
                 rows={10}
                 value={csvText}
@@ -236,11 +421,24 @@ export function InventoryPage({
             </div>
 
             <div className="bg-[#1A1A1A] text-white rounded-[32px] p-6">
-              <h2 className="text-2xl font-serif italic mb-4">Launch checklist</h2>
+              <h2 className="text-2xl font-serif italic mb-4">Entity types</h2>
               <ul className="space-y-3 text-sm text-white/75">
-                <li>• Add at least one real item before launch.</li>
-                <li>• Save inventory to route it through Supabase when available.</li>
-                <li>• Commerce templates can also sync inventory to Medusa on deploy.</li>
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] mt-0.5">P</span>
+                  <div><strong>Product:</strong> Physical/digital goods with price and category.</div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Clock className="w-5 h-5 text-blue-400 mt-0.5" />
+                  <div><strong>Service:</strong> Duration, service radius, pricing model (hourly/fixed).</div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <DollarSign className="w-5 h-5 text-emerald-400 mt-0.5" />
+                  <div><strong>Package/Subscription:</strong> Features list, billing cycle (monthly/yearly/one-time).</div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Calendar className="w-5 h-5 text-purple-400 mt-0.5" />
+                  <div><strong>Booking Slot:</strong> Availability windows, capacity, recurrence.</div>
+                </li>
               </ul>
               <p className="text-xs text-white/50 mt-4">{status || 'Nothing saved yet.'}</p>
             </div>
