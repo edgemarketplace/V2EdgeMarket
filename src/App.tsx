@@ -157,7 +157,8 @@ export default function App() {
         slug,
         inventoryItems: data.inventory?.items || [],
       });
-      setLocation('/editor');
+      // Go to inventory FIRST (not editor) - inventory is the first step after onboarding
+      setLocation(`/inventory/${siteId}`);
     } catch (e) {
       console.error("AI Generation failed:", e);
       const mappedConfig = mapIntakeToPuckConfig(data);
@@ -204,7 +205,7 @@ export default function App() {
                 inventoryCount={editorState.inventoryItems.length}
                 publishUrl={editorState.publishUrl}
                 onPublish={() => setLocation('/checkout')}
-                onOpenInventory={() => setLocation('/inventory')}
+                onOpenInventory={() => setLocation(`/inventory/${editorState?.siteId}`)}
                 onOpenCheckout={() => setLocation('/checkout')}
                 onOpenLive={() => setLocation('/published')}
               />
@@ -215,38 +216,41 @@ export default function App() {
             )}
           </Route>
           
-          <Route path="/inventory">
-            {intakeData && editorState ? (
-              <InventoryPage
-                draft={{
-                  siteId: editorState.siteId,
-                  slug: editorState.slug,
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                  status: 'inventory',
-                  selectedPlan: 'launch',
-                  intakeData,
-                  templateFamily: editorState.templateFamily,
-                  rootProps: editorState.rootProps,
-                  editorData: { content: [] },
-                  inventoryItems: editorState.inventoryItems,
-                } as any}
-                onBack={() => setLocation('/editor')}
-                onContinue={(items) => {
-                  setEditorState((prev) => (prev ? { ...prev, inventoryItems: items } : prev));
-                  setLocation('/checkout');
-                }}
-                onSaveDraft={(items) => {
-                  setEditorState((prev) => (prev ? { ...prev, inventoryItems: items } : prev));
-                }}
-              />
-            ) : (
-              <div className="p-20 text-center">
-                <p>No inventory data found. Please complete <a href="/onboarding" className="underline">onboarding</a>.</p>
-              </div>
-            )}
+          <Route path="/inventory/:siteId?">
+            {((params) => {
+              const siteId = params.siteId || editorState?.siteId;
+              return (intakeData && editorState && siteId) ? (
+                <InventoryPage 
+                  draft={{
+                    siteId: siteId,
+                    slug: editorState.slug,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    status: 'inventory',
+                    selectedPlan: 'launch',
+                    intakeData,
+                    templateFamily: editorState.templateFamily,
+                    rootProps: editorState.rootProps,
+                    editorData: { content: [] },
+                    inventoryItems: editorState.inventoryItems,
+                  } as any}
+                  onBack={() => setLocation(`/editor`)}
+                  onContinue={(items) => {
+                    setEditorState((prev) => (prev ? { ...prev, inventoryItems: items } : prev));
+                    setLocation('/checkout');
+                  }}
+                  onSaveDraft={(items) => {
+                    setEditorState((prev) => (prev ? { ...prev, inventoryItems: items } : prev));
+                  }}
+                />
+              ) : (
+                <div className="p-20 text-center">
+                  <p>No inventory data found. Please complete <a href="/onboarding" className="underline">onboarding</a>.</p>
+                </div>
+              );
+            }) as any}
           </Route>
-
+          
           <Route path="/checkout">
             {intakeData && editorState ? (
               <CheckoutPage 
