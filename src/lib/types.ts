@@ -101,13 +101,62 @@ export interface ValidationRule {
   errorMessage: string;
 }
 
+export type InventoryEntityType = 'product' | 'service' | 'package' | 'booking_slot' | 'subscription';
+
 export interface InventoryItem {
   id?: string;
   name: string;
+  type?: InventoryEntityType;
   price?: number | string;
   description?: string;
   category?: string;
   image?: string;
+  // Service-native fields
+  duration?: number; // minutes
+  serviceRadius?: number; // miles/km
+  coverageArea?: string; // city, region
+  capacity?: number; // max clients/attendees
+  recurrence?: 'one-time' | 'weekly' | 'monthly' | 'custom';
+  // Pricing model
+  pricingModel?: 'hourly' | 'fixed' | 'package' | 'subscription';
+  // Availability
+  availabilityWindows?: AvailabilityWindow[];
+  // Package/Subscription
+  features?: string[];
+  billingCycle?: 'monthly' | 'yearly' | 'one-time';
+}
+
+export interface AvailabilityWindow {
+  dayOfWeek: number; // 0-6 (Sun-Sat)
+  startTime: string; // HH:MM
+  endTime: string; // HH:MM
+  slotDuration?: number; // minutes
+}
+
+export interface ServiceHydrationResult {
+  title: string;
+  description: string;
+  image?: string;
+  duration?: number;
+  pricingModel?: string;
+  serviceRadius?: number;
+  coverageArea?: string;
+  capacity?: number;
+}
+
+export interface ProductHydrationResult {
+  name: string;
+  price: string;
+  category: string;
+  image?: string;
+}
+
+export interface PackageHydrationResult {
+  name: string;
+  price: string;
+  ctaText: string;
+  features: { label: string }[];
+  billingCycle?: string;
 }
 
 export interface InventoryData {

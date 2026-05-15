@@ -1,12 +1,12 @@
 import React from 'react';
 import { EditorData, EdgeRootProps, InventoryItem, MarketplaceSiteDraft } from '../lib/types';
 import { getStorefrontComponent } from '../lib/storefrontRegistry';
-
-function formatPrice(price?: string | number) {
-  if (typeof price === 'number') return `$${price.toFixed(2)}`;
-  if (!price) return '$0.00';
-  return String(price).startsWith('$') ? String(price) : `$${price}`;
-}
+import {
+  resolveFeaturedProducts,
+  resolveCollections,
+  resolveServiceCards,
+  resolveGridPackages,
+} from '../lib/commerce-runtime';
 
 function hydrateBlockProps(block: any, inventoryItems: InventoryItem[], draft?: MarketplaceSiteDraft) {
   // Check if component has a data source preference
@@ -25,50 +25,28 @@ function hydrateBlockProps(block: any, inventoryItems: InventoryItem[], draft?: 
   if (block.type === 'GridFeaturedProducts') {
     return {
       ...block.props,
-      items: inventoryItems.slice(0, 8).map((item) => ({
-        name: item.name,
-        price: formatPrice(item.price),
-        category: item.category || draft?.intakeData?.businessType || 'Featured',
-        image: item.image,
-      })),
+      items: resolveFeaturedProducts(inventoryItems, draft, 8),
     };
   }
 
   if (block.type === 'GridCollections') {
-    const categories = Array.from(new Set(inventoryItems.map((item) => item.category).filter(Boolean)));
-    if (!categories.length) return block.props;
     return {
       ...block.props,
-      items: categories.slice(0, 4).map((category) => ({
-        title: category as string,
-        image: inventoryItems.find((item) => item.category === category)?.image,
-      })),
+      items: resolveCollections(inventoryItems),
     };
   }
 
   if (block.type === 'GridServiceCards' && draft) {
     return {
       ...block.props,
-      items: inventoryItems.slice(0, 6).map((item) => ({
-        title: item.name,
-        description: item.description || draft.intakeData?.offerings || '',
-        image: item.image,
-      })),
+      items: resolveServiceCards(inventoryItems, draft, 6),
     };
   }
 
   if (block.type === 'GridPackages') {
     return {
       ...block.props,
-      items: inventoryItems.slice(0, 3).map((item) => ({
-        name: item.name,
-        price: formatPrice(item.price),
-        ctaText: draft?.intakeData?.primaryGoal === 'quote' ? 'Request Proposal' : 'Choose Package',
-        features: [
-          { label: item.category || 'Signature offering' },
-          { label: item.description || 'Tailored for your customers' },
-        ],
-      })),
+      items: resolveGridPackages(inventoryItems, draft, 3),
     };
   }
 
