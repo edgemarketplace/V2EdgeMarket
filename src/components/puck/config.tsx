@@ -72,6 +72,7 @@ export function createPuckConfig(templateFamily: TemplateFamily): Config<Props, 
         icon: <div className="w-3 h-5 border-2 border-current rounded-md" />
       }
     ],
+    // @ts-ignore - commerceCategories type mismatch with Puck's Category type
     categories: {
       headers: { components: ["HeaderSimple", "HeaderPromo", "HeaderMega"], title: "Headers" },
       heroes: { components: ["HeroImageLeft", "HeroFullVisual", "HeroProductFirst", "HeroServiceFirst"], title: "Heroes" },

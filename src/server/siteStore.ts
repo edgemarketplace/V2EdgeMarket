@@ -58,7 +58,7 @@ const ACTIVE_DEPLOYMENT_STATUSES: SiteLifecycleStatus[] = [
 
 const TERMINAL_DEPLOYMENT_STATUSES: SiteLifecycleStatus[] = ['live', 'failed'];
 
-function getSupabaseAdmin(): SupabaseClient | null {
+export function getSupabaseAdmin(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

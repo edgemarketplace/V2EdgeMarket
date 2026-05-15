@@ -16,6 +16,7 @@ import {
   saveLaunchPlan,
   saveMarketplaceDraftSnapshot,
   verifySiteAccess,
+  getSupabaseAdmin,
   markFailed,
   retryDeployment,
   reconcileWithLease,

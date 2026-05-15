@@ -28,7 +28,8 @@ export function EditorPage({ initialData, puckContent, templateFamily, rootProps
   const [activePage, setActivePage] = useState('home');
   const [validationResult, setValidationResult] = useState<any>(null);
   const [mobileAck, setMobileAck] = useState(false);
-  const { siteId } = useParams();
+  const params = useParams() as { siteId?: string };
+  const { siteId } = params;
   const [location, navigate] = useLocation();
   const [workflowState, setWorkflowState] = useState<any>(null);
   const [workflowLoading, setWorkflowLoading] = useState(true);

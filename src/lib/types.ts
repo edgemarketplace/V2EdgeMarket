@@ -273,6 +273,7 @@ export interface MarketplaceSiteDraft {
   templateFamily: TemplateFamily;
   rootProps: EdgeRootProps;
   editorData: EditorData;
+  puckData?: any; // Puck editor data for hydration
   inventoryItems: InventoryItem[];
   inventorySource?: InventoryData['method'];
   deployment?: DeploymentRecord;
