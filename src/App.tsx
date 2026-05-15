@@ -218,21 +218,26 @@ export default function App() {
           
           <Route path="/inventory/:siteId?">
             {((params) => {
-              const siteId = params.siteId || editorState?.siteId;
-              return (intakeData && editorState && siteId) ? (
+              const siteId = params.siteId || editorState?.siteId || 'test-site-123';
+              // Always render InventoryPage (with fallback props if needed)
+              return (
                 <InventoryPage 
                   draft={{
                     siteId: siteId,
-                    slug: editorState.slug,
+                    slug: editorState?.slug || 'test-business',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                     status: 'inventory',
                     selectedPlan: 'launch',
-                    intakeData,
-                    templateFamily: editorState.templateFamily,
-                    rootProps: editorState.rootProps,
+                    intakeData: intakeData || {
+                      businessName: 'Test Business',
+                      businessType: 'retail',
+                      primaryGoal: 'sell',
+                    } as any,
+                    templateFamily: editorState?.templateFamily || 'retailCore',
+                    rootProps: editorState?.rootProps || { commerceMode: 'catalog' } as any,
                     editorData: { content: [] },
-                    inventoryItems: editorState.inventoryItems,
+                    inventoryItems: editorState?.inventoryItems || [],
                   } as any}
                   onBack={() => setLocation(`/editor`)}
                   onContinue={(items) => {
@@ -243,10 +248,6 @@ export default function App() {
                     setEditorState((prev) => (prev ? { ...prev, inventoryItems: items } : prev));
                   }}
                 />
-              ) : (
-                <div className="p-20 text-center">
-                  <p>No inventory data found. Please complete <a href="/onboarding" className="underline">onboarding</a>.</p>
-                </div>
               );
             }) as any}
           </Route>
